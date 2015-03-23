@@ -1,0 +1,118 @@
+*RAILS*
+*******
+
+
+TEXT_FIELD VS TEXT_FIELD_TAG
+----------------------------
+
+The main difference is that "text_field" requires an existing column in the database and you always have to use it in combination with "form_for". "form_for" is a "model-backed" form.
+
+<%= form_for @user do |f| %>
+  <%= f.text_field :name %>
+  <%= f.submit %>
+<% end %>
+
+
+We use "text_field_tag" if we don't need to involve the model or database. An example? Let's say we want to write a form for password reset. The user has to insert his email-address and the app will send a notification to his address. No database involved:
+
+<%= form_tag password_reset_path do %>
+  <%= text_field_tag :email %>
+  <%= submit_tag %>
+<% end %>
+
+
+RENAME PLUGIN:
+--------------
+Koristan plugin za renamovanje app.
+U railsu ime app je rezervisano pa se posle nemoze koristiti za resource.
+https://github.com/get/Rename
+
+Ovo je deprecated in Rails 4 (pluginovi uopste)
+
+Ali je korisna lista gde treba izvrsiti rename:
+config/application.rb
+config/environment.rb
+config/environments/development.rb
+config/environments/test.rb
+config/environments/production.rb
+config/routes.rb
+config.ru
+config/initializers/secret_token.rb
+config/initializers/session_store.rb
+
+HEROKU:
+-------
+Obratiti paznju na DB migracije, ne zaboraviti da treba migration uraditi i za production env.
+
+
+KORISNI METHODI:
+----------------
+times_ago_in_words() > konvertuje vreme (npr polje created_at) u human readible format
+
+
+SQL RELACIJE:
+-------------
+U sustini Relationship model je suvisan jer je moglo da se resi problem povezivanja db uz pomoc has_and_belongs_to_many.
+Ovaj metod uklanja potrebu za posrednom tabelom/modelom.
+
+Ili je mogao da se koristi has_many :through.
+
+
+POJASNJENJE HIDDEN FIELD ZA FOLLOW:
+-----------------------------------
+Ovde se podesava samo :followed_id zbog sigurnosti.
+Jer u suprotnom moze lako da se napravi hack kojim bi se moglo
+izvrisiti povezivanje bilo kog usera sa nekim postom.
+Zato nije ubacen follower_id.
+Ukratko omogucilo bi postavljane nezeljenih relacija izmedju usera.
+
+<%= form_for @relationship do |f| %>
+  <%= f.hidden_field :followed_id, value: @user.id %>
+  <%= f.submit "Follow" %>
+<% end %>
+
+
+RELATIONSHIP#CREATE
+-------------------
+Ovde je falio follower_id, jer nije postovan zbog sigurnosnih razloga.
+Zato se on dodaje posle .new jer fale parametri.
+
+relationship = Relationship.new(params[:relationship])
+
+1. relationship.follower_id = current_user.id
+2. relationship.follower = current_user
+
+1 i 2 su isti.
+2 koristi ime iz Relationship Modela i njegove belongs_to :follower
+
+redirect_to relationship.followed # opet se poziva belongs_to :followed
+
+U rails po defaultu kada se redirect_to vrsi na instance uvek se redirectuje na Show view.
+
+USERS#SHOW
+----------
+Ovde se objasnjava par caka vezanih za relationship.
+Ova promenljiva je Relationship.new (prazan obj) ukoliko nije taj user nije followan.
+Medjutim, ako vec jeste followed onda ona mora da sadrzi follower_id, followed_id, da bi imalo sta
+da se prikaze.
+
+Zato koristimo first_or_initialize method.
+1. Filtriramo uz pomoc where odgovarajuce rows iz db
+2. first_or_initalize ukoliko postoji rezultati kreira obj sa tim poljima
+   Ukoliko ne postoji samo inicijalizira prazan obj
+3. Ovo treba da se izvrsi samo ukoliko je korisnik logovan
+
+@user = User.find(params[:id])
+@ribbit = Ribbit.new # zbog partial ribbit_new_form
+@relationship = Relationship.where(
+  follower_id: current_user.id,
+  followed_id: @user.id
+).first_or_initialize if current_user
+
+
+MAP RAILS
+---------
+The & symbol is used to denote that the following argument should be treated as the block given to the method. That means that if it's not a Proc object yet, its to_proc method will be called to transform it into one.
+Category.all.map(&:id)
+/* Category.all.map(&:id.to_proc) */
+Category.all.map { |a| a.id  } # isto sto i gornje
