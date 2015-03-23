@@ -1,0 +1,369 @@
+RAZNE BELESKE:
+
+C6
+==
+
+Korisna fora za css, tako moze da se vrsi formatiranje razlicito za svaki ctrl:
+class='<%= controller.controller_name %>'>
+
+
+C7
+==
+
+Custom validacija:
+validates :image_url, allow_blank: true, format: {
+  with: %r{\.(gif|jpg|png)\Z}i,
+  message: 'must be a URL for GIF, JPG or PNG image.'
+}
+
+Fixtures
+--------
+Koristi se za testiranje modela (fakedata). test/fixtures/naziv_tabele_modela.yml
+
+
+C8
+==
+
+Named path:
+root 'store#index', as: 'store'
+
+Helper za formatiranje cene:
+number_to_currency(product.price)
+
+Caching
+-------
+Nije bas najdetaljnije objasnjen kod.
+Ovde zelimo da izbegnemo konstantno pozivanje DB i renderovanje stavki.
+
+# /config/enviroments/
+config.action_controller.perform_caching = true
+
+# models/product.rb
+def self.latest
+  Product.order(:updated_at).last
+end
+
+# views/store/index.html.erb
+# Ovo je sustina, Russian doll caching
+<% cache ['store', Product.latest] do %>
+  <% @products.each do |product| %>
+    <% cache ['entry', product] do %>
+      <div class="entry">
+        <%= image_tag(product.image_url) %>
+        <h3><%= product.title %></h3>
+        <%= sanitize(product.description) %>
+        <div class="price_line">
+          <span class="price"><%= number_to_currency(product.price) %></span>
+        </div>
+      </div>
+    <% end %>
+  <% end %>
+<% end %>
+
+
+C9
+==
+
+Korisno resenje za podesavanje Cart. Trazi cart, ukoliko ga ne nadje (ActiveRecord::... error) ide rescue block
+Ujedno i primer concern, koji predstavljaju neku vrstu shareovanih f() izmedju ctrl.
+
+module CurrentCart
+  extend ActiveSupport::Concern
+
+  private
+
+  def set_cart
+    @cart = Cart.find(session[:cart_id])
+  rescue ActiveRecord::RecordNotFound
+    @cart = Cart.create
+    session[:cart_id] = @cart.id
+  end
+end
+
+.BUILD
+
+Ovo se koristi za generisanje itema iz has_many relacija.
+On automatski pravi sve odgovarjuce row u lancu.
+
+cart.line_items.build(product: product)
+
+
+C10
+===
+
+Migracije:
+rails g migration add_XXX_to_TABLE # ili remove... # PATTERN
+rails g migration add_quantity_to_line_items quantity:integer
+>> add_column :line_items, :quantity, :integer
+
+CART
+Korisno za primer kada se doda vise istih itema, umesto da se napravi novi unos ovde se proverava da li je vec
+dodat item, ako jeste povecava se qty, ukoliko nije pravi se novi LineItem:
+
+def add_product(product_id)
+  current_item = line_items.find_by(product_id: product_id)
+  if current_item
+    current_item.quantity += 1
+  else
+    current_item = line_items.build(product_id: product_id)
+  end
+  current_item
+end
+
+Nakon toga se vrsi migracija, da bi se izbrisali nepotrebni unosi u DB:
+
+def up
+  # replace multiple items for a single product in a cart with a single item
+  Cart.all.each do |cart|
+    # count the number of each product in the cart
+    sums = cart.line_items.group(:product_id).sum(:quantity)
+
+    sums.each do |product_id, quantity|
+      if quantity > 1
+        # remove individual items
+        cart.line_items.where(product_id: product_id).delete_all
+
+        # replace with a single item
+        item = cart.line_items.build(product_id: product_id)
+        item.quantity = quantity
+        item.save!
+      end
+    end
+  end
+end
+
+def down
+  # split items with quantity>1 into multiple items
+  LineItem.where("quantity>1").each do |line_item|
+    # add individual items
+    line_item.quantity.times do
+      LineItem.create cart_id: line_item.cart_id,
+        product_id: line_item.product_id, quantity: 1
+    end
+
+    # remove original item
+    line_item.destroy
+  end
+end
+
+Korisna komanda za migracije:
+rake db:migrate:status
+
+
+C11
+===
+
+Render:
+We’ll make use of the fact that you can pass a collection to
+the method that renders partial templates, and that method will automatically
+invoke the partial once for each item in the collection. Let’s rewrite our cart
+view to use this feature.
+
+# /views/carts/show.html.erb
+<%= render(@cart.line_items) %>
+
+# /views/line_items/_line_item.html.erb
+tr>td*3 ... line_item.quantity ....
+
+There’s something subtle going on here. Inside the partial template, we refer
+to the current object using the variable name that matches the name of the
+template. In this case, the partial is named line_item , so inside the partial we
+expect to have a variable called line_item .
+
+AJAX
+
+# view, button_to
+remote: true # aktivacija ajax
+
+# ctrl respond_to block u npr create action
+...
+format.js # auto poziva create.js.erb template
+
+
+C12
+===
+
+Validacija uz pomoc custom []
+
+PAYMENT_TYPES = [ "Check", "Credit card" ]
+validates :pay_type, inclusion: PAYMENT_TYPES
+
+
+Primer nested routes, on: :member je bitno, ono se odnosi samo na jednog clana a ne celinu
+/products/3/who_bought
+resources :products do
+  get :who_bought, on: :member # who_bought je ctrl action
+end
+
+
+C13
+===
+
+MAIL
+
+Primer konfiguracije:
+
+Depot::Application.configure do
+  config.action_mailer.delivery_method = :smtp
+
+  config.action_mailer.smtp_settings = {
+    address:
+    "smtp.gmail.com",
+    port:
+    587,
+    domain:
+    "domain.of.sender.net",
+    authentication: "plain",
+    user_name:
+    "dave",
+    password:
+    "secret",
+    enable_starttls_auto: true
+  }
+end
+
+# Kreiraj mail ctrl
+rails generate mailer OrderNotifier received shipped
+
+# Mail kontroler
+class OrderNotifier < ActionMailer::Base
+
+default from: 'Sam Ruby <depot@example.com>'
+
+def received
+  @greeting = "Hi"
+  mail to: "to@example.org", subject: "Neki sub"
+end
+
+def shipped
+  @greetings = "Hi"
+
+  mail to: "to@example.org"
+end
+
+# Mail view
+/views/order_notifier/received.text.erb
+Ovde ide template, klasika ERB
+
+# Slanje maila
+OrderNotifier.received(@order).deliver
+
+
+C14
+===
+
+Login
+
+RAILS AUTHENTICATE:
+Model (User) mora da ima: password:digest polje (u schmei je to: t.string "password_digest")
+U modelu mora da bude aktiviran method: has_secure_password
+Ovo auto generise i var password, password_confirm koji ne postoje u bazi vec privremeno sluze za provere.
+
+# Gem za sifrovanje
+gem 'bcrypt-ruby', '~3.1.0'
+
+SESSION & ADMIN CTRL
+
+# Generisi ctrl
+rails generate controller Sessions new create destroy
+rails generate controller Admin index
+
+# Authenticate method za session_ctrl
+def create
+  user = User.find_by(name: params[:name])
+
+  if user and user.authenticate(params[:password])
+    session[:user_id] = user.id
+    redirect_to admin_url
+  else
+    redirect_to login_url, alert: "Invalid user/password combination"
+  end
+end
+
+# Logout
+def destroy
+  session[:user_id] = nil
+  redirect_to store_url, notice: "Logged out"
+end
+
+# View za login formu je views/sessions/new.html.erb
+Tu se koristi form_tag umesto form_for.
+
+# Routes za sessions, ovo nisam nasao u dokumentaciji(mozda se nalazi u ctrl sekciji)
+# Ovde se u sustini odredjene route-names vezuju za akciju ctrl
+controller :sessions do
+  get 'login' => :new
+  post 'login' => :create
+  delete 'logout' => :destroy
+end
+
+# Limitiranje pristupa, ovo resenje smesta proveru u application_ctrl i onda ga selektivno iskljucuje u odgovarajucem ctrl
+# application_controller.rb
+before_action :authorize
+
+protected
+
+  def authorize
+    unless User.find_by(id: session[:user_id])
+      redirect_to login_url, notice: "Please login"
+    end
+  end
+
+# Ovako preskacemo authentication za odredjene akcije u nekom ctrl
+skip_before_action :authorize, only: [:new, :create]
+
+# Jedan od problema koji moze da se javi jeste da se npr izbrisu svi admin users.
+# Ovo se resava sa novom methodom koja raise error
+model/user.rb
+after_destroy :ensure_an_admin_remains
+
+private
+  def ensure_an_admin_remains
+    if User.count.zero?
+      raise "Cant delet last user"
+    end
+  end
+
+controllers/users_controllre.rb
+def destory
+  begin
+    @user.destroy
+    flash[:notice] = "User #{user.name} deleted"
+  rescue StandardError => e
+    flash[:notice] = e.message # ovo je raise iz ensure_an_admin_remains
+  end
+
+
+
+
+
+
+PRODUCT_PATH VS PRODUCT_URL
+---------------------------
+When you use product_url , you’ll get the full enchilada with protocol and domain name,
+like http://example.com/products/1. That’s the thing to use when you’re doing redirect_to
+because the HTTP spec requires a fully qualified URL when doing 302 Redirect and
+friends. You also need the full URL if you’re redirecting from one domain to another,
+like product_url(domain: "example2.com", product: product) .
+
+The rest of the time, you can happily use product_path . This will generate only the
+/products/1 part, and that’s all you need when doing links or pointing forms, like link_to
+"My lovely product", product_path(product) .
+
+
+FORM_FOR
+--------
+
+CTRL:
+def edit
+  @order = Order.find(...)
+end
+
+MODEL OBJ:
+@order.name = "Mica"
+
+<%= form_for @order do |f| %>           # @order iz ctrl
+  <%= f.label :name, "Name" %>
+  <%= f.text_field :name, size: 20 %>   # name iz obj.name
+<% end %>
+

@@ -1,0 +1,159 @@
+RELATIONSHIP TYPES
+------------------
+
+Omogucava povezivanje modela/tabela.
+
+ActiveRecord >> associations
+
+Tipovi db asocijacije:
+1. One-to-one
+2. One-to-many
+3. Many-to-many
+
+Primer: Koristi se primer classroom, teacher, courses, students
+
+
+1. ONE-TO-ONE
+
+Veoma retko se koristi, cesto za razbijanje jedne tabele na vise manjih.
+Uglavnom zbog performansi.
+
+1:1
+Classroom "has_one" teacher (parent)
+Teacher "belongs_to" classroom (child)
+
+Rails:
+Classroom has_one :teacher
+Teacher belongs_to :classroom
+
+Foreign key >> teacher table
+
+Foreign key UVEK ide u child (belongs_to) tabelu!
+
+
+2. ONE-TO-MANY
+
+Najcesce koriscene relacije. Plural. Vraca array of objects.
+
+1:m
+Teacher "has_many" courses (parent)
+Course "belongs_to" teacher (child)
+
+Rails:
+Teacher has_many :courses
+Course belongs_to :teacher
+
+Foreign key >> courses table
+
+
+3. MANY-TO-MANY
+
+Moze da se razmislja kao o one-to-many asocijacija OBOSTRANA.
+Problem je gde cuvati foreing_keys. Resenje je u join tables.
+
+m:n
+Course "has_many" students AND "belongs_to" many students
+Student "has_many" courses AND "belongs_to" many courses
+
+Rails:
+Course has_and_belongs_to_many :students
+Student has_and_belongs_to_many :courses
+
+2x Foreign key >> join table
+
+JOIN TABLE:
+***********
+Cuva oba foreing key ( indexira ih )
+NO PRIMARY KEY (id: false)
+Cuva student_id + course_id
+
+Naziv join tabele(migracije):
+first_table+_+second_table
+> plural, slozene alfabetski
+>> courses_students
+BITNO je da se doda argument u def change >> :id => false da se ne bi generisali primary key
+
+RICH JOIN TABLE:
+****************
+Prostije join tabele nisu dovoljne da bi se resili neki problemi, ili kada poraste kompleksnost aplicakije / db.
+
+Npr simple join table cuvaju SAMO 2 foreign_key, ukoliko zelimo da dodamo jos informacija u join tabelu (npr seat, absence za studente) moramo da koristimo RICH JOIN TABLE.
+Kreiramo course_enrollement tabelu za rich join table.
+
+Ovde se uspostavljaju HAS_MANY relacije izmedju COURSES tabele i COURSENROLLEMENT tabele, kao i HAS_MANY izmedju STUDENT i COURSEENROLMENT.
+U sustini to su 2 HAS_MANY relacije od strane modela KA join tabeli.
+
+COURSE   >> CourseEnrollemnt << STUDENT
+has_many >>  belongs_to      << has_many
+
+Rich JOIN table >> zahtevaju PRIMARY KEY
+one takodje imaju sopstven MODEL
+
+Za razliku od simple join tabela, rich join zahteva da sami pozivamo odgovarajuce metode i popunjavamo polja u db.
+
+# CourseEnrollement je novi model za rich join tabelu.
+# course > course_id > course table foreing_key
+# student > student_id > student table foreing_key
+#
+CourseEnrollement.create(course: 1, student: "Timmy", nesto: "bilo sta")
+
+
+# HAS_MANY :THROUGH #
+#####################
+has_many :editors, :through => :section_edits, :class_name => "AdminUser"
+
+JEDNA STRANA:
+AdminUser has_many :section_edits >> RICH JOIN
+AdminUser has_many :sections, :through => :section_edits >> druga strana
+
+AdminUser >> SECTION_EDITS << Section
+
+DRUGA STRANA:
+Section has_many :section_edits
+Section has_many :admin_users, :through => section_edits
+
+
+
+
+--- UVEK DEFINISI HAS_MANY + bELONGS_TO U OBA MODELA ---
+
+###########
+
+AUTO GENERISANE HAS_ METHODE
+
+Nakon sto se u modelima podesi has_one/belongs_to rails AUTO generise
+'relacione' metode. Oni omogucavaju pristup uz pomoc foreign key drugoj povezanoj tabeli i obrnuto i druge korisne stvari.
+
+NPR: Subject > Page
+
+subject = Subject.find(1) # pronadji subject sa id 1
+first_page = Page.new(name: "First Page", itd..) # kreiraj novu stranu
+
+subject.page = first_page # ovo je generisano od strane rails
+# subject.page >> pristupa foreign key (subject_id iz tabele pages)
+# gornja komanda ubacuje id subjecta u subject_id odgovarajuceg Page
+
+first_page.subject # obrnuto pozivanje, strana pristupa odgovarjucem Subject
+
+HAS_ONE:
+-------
+subject.page # pristupa odgovarajucoj strani
+first_page.subject # pristup subjectu parentu page
+
+HAS_MANY:
+---------
+subject.pages # array svi Pages
+subject.pages << page # ADD page u array
+subject.pages.delete(page) # delete 1 page iz array
+subject.pages.destroy(page) # delete from DB
+subject.pages.clear # obrisi SVE page
+subject.pages.empty? # proveri da li je prazan
+subject.pages.size # velicina array
+
+
+### DESTROY RELATION/RECORD ###
+subject.page.destroy
+
+# CHAINOVANJE SA QUERY METHODAMA:
+subject.pages.where(visible: true)
+

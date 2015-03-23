@@ -1,0 +1,2500 @@
+AGILE WEB DEV RAILS 4
+*********************
+
+OVERVIEW OF RAILS
+=================
+
+DIRECTORY STRUCTURE
+-------------------
+ime_app/
+> app/         # Models, Controllers, Views, Helpers, Assets, Mailer...
+> bin/         # wrapper scripts (npr maintenance console tasks) > bundle binstubs # generise kod za ...?
+               # Ovaj / takodje sadrzi i rails komande (console, dbconsole, destroy, generate, new, runner, server)
+> config/      # configuration, enviroments, db
+> config.ru    # rack server config (webbrick)
+> db/          # schema & migrations
+> Gemfile      # Gem dependencies
+> Gemfile.lock # belezi verzije svih gemova koji su upoterebljeni
+> lib/         # shared code
+> log/         # log files (development.log, test.log, production.log)
+               # Sadrze ne samo trace lines, vec i timing stats, cache info, db statements
+> public/      # web-accessable dir, start, static
+> Rakefile     # Build script, rake -T za listu taskova
+> Readme.rdoc  # Instalation & usage info
+> README       # General info on rails
+> test/        # Test framework files
+> tmp/         # runtime tmp files
+> vendor/      # imported code (vise se ne koristi, uglavnom je sada preko system gems)
+
+* RAZNO:
+> doc/         # vise nije standardno ukljucen u rails, ali se moze generisati sa:
+               # rake doc:app   # ovo generise doc od same app
+               # rake doc:rails # dokumentacija od samog Rails
+               # rake doc:guide # rails guide dokumentacija
+
+
+LIB
+---
+Ovde se nalazi kod koji se ne uklapa u model, ctrl, view.
+Takodje se koristi za shareovanje koda izmedju MVC
+
+Da bi se fajlovi iz lib/ auto loadovali u app, neophodno je sl:
+> config/application.rb
+config.autoload_paths += %W(#{Rails.root}/lib)
+
+Ukoliko je naziv fajla lowercase_ od naziva klase ili modula( iz lib ) onda ga Rails auto-loaduje.
+Ukoliko lib ne prati konvenciju onda ga je neophodno ulkjuciti sa:
+require 'nesto'        # lib/nesto.rb
+require 'folder/nesto' # lib/folder/nesto.rb
+
+TASKS
+-----
+
+Folder koji se nalazi u lib/ i sluzi za rake taskove. Rake extenzija.
+NPR:
+> lib/tasks/db_schema_migrations.rake
+> namespace - oznacava da pripada db grupi taskova (db:migrate ...)
+> task - ovde ide naziv taska za rake
+namespace :db do
+  desc "Prints the migrated versions"
+  task :schema_migrations => :environment do
+    puts ActiveRecord::Base.connection.select_values(
+    'select version from schema_migrations order by version' )
+  end
+end
+
+> rake db:schema_migrations
+
+Dodatna dokumentacija na: rubyrake.org
+
+
+CONFIG
+------
+Ovde se nalaze svi fajlovi sa kojima se konfigurise rails.
+
+Prilikom pokretanja app, rails prvo ucitava i exec config/enviroments.rb + config/application.rb
+Oni dalje loaduju sl.dir:
+>>  app/controllers/*.*
+>>  app/models
+>>  vendor/
+>>  app/, app/helpers, app/mailers, app/services, lib/
+
+Postoje 3 enviroments: development, test, production.
+Ukoliko zelimo custom enviroment neophodno je:
+1. napraviti file u /config/enviroments/naziv.rb
+2. dodati novu opciju u db confing: database.yml
+
+RAILS_ENV > rake parametar
+
+
+NAMING CONVENTIONS
+-----------------
+Rails auto loaduje sve u app ukoliko se prate odredjene konvencije, tako da nije potreban require.
+
+Model:
+>> Table:  line_items
+>> File:   app/models/line_item.rb
+>> Class:  LineItem
+
+Ctrl:
+>> Url:    http://.../store/list
+>> File:   app/controllers/store_controllers.rb
+>> Class:  StoreController
+>> Method: list
+>> Layout: app/views/layouts/store.html.erb
+
+View:
+>> Url:    http://.../store/list
+>> File:   app/views/store.list.html.erb
+>> Helper: module StoreHelper
+>> File:   app/helpers/store_helper.rb
+
+CTRL MODULE
+-----------
+Npr treba nam book ctrl kao pod-ctrl od admin: (pod admin namespace)
+> controllers/admin/book_controller.rb
+> admin > je dir od parent ctrl
+class Admin::BookController < ActionController::Base
+
+Moguce je koristiti i generator:
+rails generate controller Admin::Book action1 ...
+
+
+//////////////////////////////////////////////////////////////////////
+
+
+ACTIVERECORD
+============
+
+Object Relational Mapping (ORM) > OOP on top of SQL
+
+Modeli << ActiveRecord::Base
+
+Model Class name = singular
+table name = plural of model name
+
+Class Name ::  Table Name
+-------------------------
+Order           orders
+TaxAgency       tax_agencies
+Batch           batches
+
+PLURAL RECI
+-----------
+Rails ima dobar sistem za plural reci, medjutim ukoliko je neophodno prosiriti ga
+mozese dodati rec u config:
+> /config/initializers/inflection.rb
+ActiveSupport::Inflector.inflections do |inflect|
+  inflect.irregular 'tax', 'taxes'
+end
+
+CUSTOM TABLE NAME:
+self.table_name = "naziv"
+
+
+ODNOS DB I ORM
+--------------
+Klase = DB table
+Instance of Class = table rows
+Intance attributes = columns table
+
+U modelu se ne nalaze podaci o db table itd..
+ActiveRecord ih generise dinamicki at runtime na osnovu scheme.
+"Classes that wrap tables"
+
+MIGRATION
+Podaci o tabeli se nalaze u migracijama.
+
+SCHEMA
+Podaci o celokupnoj bazi se nalaze u /db/schema.rb (ORM format)
+
+USEFUL METHODS
+Order.column_names
+Order.column_hash["pay_type"]
+
+ATTRIBUTES (Columns)
+Rails auto generise attribute (za neki row iz db).
+Takodje auto pravi attr_reader & attr_writer.
+
+TYPECAST
+Rails auto konvertuje vrednosti iz SQL u ruby data format:
+
+SQL                Ruby class
+------------------------------
+int, integer         Fixnum
+float, double        Float
+decimal,numeric      BigDecimal
+char,varchar,string  String
+interval,date        Date
+datetime, time       Time
+clbo,blob,text       String
+boolean              (objasnjenje)
+
+BOOLEAN
+Boolean je malo komplikovaniji zbog toga sto u ruby sve osim nil i false pretstvlja
+True (cak i nula 0). Obezbedjen je metod za proveru boolean.
+Method > naziv_column?
+user.admin?
+
+DODATNI METHODI
+1. created_at, created_on / updated_at, updated_on
+Automatski se dodaju (timestamp u migraciji).
+_on suffix = date
+_at suffix = time
+
+2. id
+Auto se generise za svaku tabelu, tip Fixnum
+
+3. xxx_id
+Foreign key, obicno plural od tabele na koju se odnosi
+
+4. xxx_count
+Neka vrsta brojaca?
+
+RAILS ==
+Rails smatra da su 2 obj jednaka (==) ukoliko su instance ISTE klase
+i imaju ISTI primary key.
+
+>> Tip
+This means that unsaved model objects may compare as equal even if
+they have different attribute data.
+
+
+RELACIJE
+--------
+Foreign_key rule
+>> Model for table taht contains foreign_key ALWAYS has belongs_to.
+>> Takodje index za DB se uvek dodadje na svako foreing_key polje.
+
+NAZIV
+belongs_to :singular
+has_one :singular
+has_many :plural
+has_and_belongs_to_many :plural
+
+ONE-TO-ONE
+----------
+order_id >> id
+
+class Invoice
+  belongs_to :order
+end
+
+Class Order
+  has_one :invoice
+end
+
+
+ONE-TO-MANY
+-----------
+class LineItem
+  belongs_to :order
+end
+
+class Order
+  has_many :line_items
+end
+
+MANY-TO-MANY
+------------
+class Category
+  has_and_belongs_to_many :products
+end
+
+class Order
+  has_and_belongs_to_many :categories
+end
+
+Ovde rails generise JOINED TABLE za habtm.
+Naziv joined tabele je 2 target tables in alphabetical order:
+categories_products
+
+Postoji mogucnost definisanja join tables "rucno".
+Onda je moguce dodati neka custom polja (npr quantity iz depot app)
+
+
+CRUD
+====
+
+CREATE
+------
+
+NEW
+Kreira obj u memoriji, koji se u DB ubacuje tek sa save.
+id se auto generise od strane Rails.
+
+# Obj attribute
+an_order = Order.new
+an_order.name = "Spleen Ideal"
+an_order.email = "test@example.com"
+an_order.address = "Nesto 12"
+an_order.pay_type = "card"
+an_order.save # bez save obj postoji samo u memory a ne u db
+
+# Block
+Order.new do |o|
+  o.name = "Spleen Ideal"
+  o.email = "test@example.com"
+  o.save
+end
+
+# Hash
+an_order = Order.new(
+  name: "Spleen Ideal",
+  email: "test@example.com"
+  ...
+    )
+an_order.save
+
+CREATE
+Inistancira model obj i skladisti ga u DB.
+
+an_order = Order.create(
+  name: "Spleen Ideal",
+  email: "test@emailc.om"
+  ...
+    )
+
+
+# Multiple obj
+orders = Order.create(
+[ { name: "Dave Thomas",
+    email: "dave@example.com",
+    address: "123 Main St",
+    pay_type: "check"
+},
+ { name: "Spleen Ideal",
+    email: "testera@example.com",
+    address: "Nesto 12",
+    pay_type: "card"
+} ])
+
+
+READ
+----
+
+FIND
+Pronalazi record na osnovu primary_key (id).
+Obicno se prilikom find ocekuje da pronadjemo record. (tacnije on vec postoji)
+Error za nepostojeci record: RecordNotFound
+
+Order.find(27)
+Order.find(params[:product_ids]) # multiple
+
+WHERE
+Kompleksnija pretraga.
+U slucaju da ne postoji trazeni record vraca nil ili prazan [] ne raisure error.
+
+Order.where("name = 'Spleen' and pay_type = 'po'")
+
+name = params[:name]
+# DO NOT DO THIS!! SQL INJECTION
+pos = Order.where("name = '#{name}' and pay_type = 'po'")
+
+
+# SAFE placeholder (slicno i u bash, sql)
+name = params[:name]
+pos = Order.where("name = ? and pay_type = 'po'", name)
+
+# SAFE named placeholders
+name = params[:name]
+pay_type = params[:pay_type]
+pos = Order.where("name = :name and pay_type = :pay_type",
+                   name: name, pay_type: pay_type)
+
+# SAFE placeholder ceo hash
+# vrsi zamenu polja auto
+pos = Order.where("name = :name and pay_type = :pay_type",
+                    params[:order]
+
+# SAFE auto uzima polja iz params
+# hash keys = column names
+# hash values = values za column
+# uzima sve vrednosti iz hash
+pos = Order.where(params[:order])
+
+# SAFE auto ali za odredjena polja
+pos = Order.where(name: params[:name],
+                  pay_type: params[:pay_type])
+
+
+LIKE
+----
+Like mora da ima na kraju % da bi se izvrsio pravilan SQL query.
+User.where("name like ?", params[:name]+"&")
+
+
+ActiveRecord::Relation
+----------------------
+Moguce je CHAINovanje.
+
+first() > vraca prvi row
+all()   > sve
+to_a()  > vraca sve rows kao []
+
+Takodje AR podrzava dosta Ruby methoda za Array obj npr each, map
+
+order() >
+Order.where(name: "Spleen").order("pay_type, shipped_at DESC")
+
+limit() >
+Order.where(name: "Spleen").order("pay_type, shpped_at DESC").limit(10)
+
+offset() >
+# slicno se koristi kod paginacije
+order(:id).limit(page_size).offset(page_num*page_size)
+
+select() >
+# Default je select * from ...
+# Select omogucava da se selektuju samo odredjen columns a ne sve.
+Talk.select("title, speaker, recorded_on")
+
+joins() >
+# Spajanje tabela???
+LineItem.select('li.quantity').
+  where("pr.title = 'Programming Ruby 1.9'").
+  joins("as li inner join products as pr on li.product_id = pr.id")
+
+readonly() >
+# causes ActiveRecord::Resource to return Active Record objects
+# that cannot be stored back into the database.o
+
+group() >
+LineItem.select("sku, sum(amount) as amount")
+        .group("sku")
+
+lock() >
+# Privremeno onemogucava da se edituje vrednost row
+# We could write code that debits an account only if there are
+# sufficient funds using something like the following:
+Account.transaction do
+  ac = Account.where(id: id).lock("LOCK IN SHARE MODE").first
+  ac.balance -= amount if ac.balance > amount
+  ac.save
+end
+
+
+COLUMN STATS
+------------
+average = Order.average(:amount
+max     = Order.maximum(:amount
+min     = Order.minimum(:amount
+total   = Order.sum(:amount
+number  = Order.count
+
+# Combo
+Order.where("amount > 20").minimum(:amount)
+
+These functions aggregate values. By default, they return a single result,
+producing, for example, the minimum order amount for orders meeting some
+condition. However, if you include the group method, the functions instead
+produce a series of results, one result for each set of records where the
+grouping expression has the same value. For example, the following calculates
+the maximum sale amount for each state:
+
+# Sa group
+result = Order.group(:state).maximum(:amount)
+puts result #=> {"TX"=>12345, "NC"=>3456, ...}
+
+
+SCOPES
+------
+Custom queries. Definisu se u modelu. Koriste se sa Proc (ruby)
+TIP: Rails nemoze da handluje vise order/limit clauses, koristi jedan po pozivu
+
+scope :last_n_days, lambda { |days| where('updated < ?', days) }
+>> Order.last_n_days(7)
+
+# Bez parametara
+scope :checks, -> { where(pay_type: :check) }
+>> Order.checks
+
+
+CUSTOM SQL
+----------
+Find_by_sql omogucava potpunu kontrolu nad SQL query.
+Return >> array of model obj
+
+orders = LineItem.find_by_sql("select line_items.* from line_items, orders " +
+          " where order_id = orders.id  " +
+          "and orders.name = 'Dave Thomas' ")"
+
+Pristupanje attributima iz find_by_sql:
+orders = Order.find_by_sql("select name, pay_type from orders")
+first = orders[0] # prvi element array
+
+p first.attributes
+p first.attribute_names
+p first.attribute_present?("address")
+
+# Rezultat
+{"name"=>"Dave Thomas", "pay_type"=>"check"}
+["name", "pay_type"]
+false
+
+REFRESH
+-------
+.reload
+U nekim slucajevima postoji mogucnost da dobijeni model obj bude STALE.
+(Npr kada se necemu pristupa od strane vise korisnika)
+
+stock = Market.find_by(ticker: "RUBY")
+loop do
+  puts "Price = #{stock.price}"
+  sleep 60
+  stock.reload
+end
+
+In practice, reload() is rarely used outside the context of unit tests.
+
+
+UPDATE
+======
+Ukoliko postoji AR obj save() ga upisuje u db. Ukoliko je taj obj prethodno bio ucitan iz db
+save() updateovati row.
+order = Order.find(23)
+order.name = 'Testera'
+order.email = 'test@gmail.com'
+order.save
+
+Shorthand za save/update:
+order.update(name: 'Testera', email: 'test@gmail.com')
+
+update() se cesto koristi u ctrl:
+def save_after_edit
+  order = Order.find(params[:id])
+  if order.update(order_params)
+    redirect_to action: :index
+  else
+    render action: :edit
+  end
+end
+
+update_all() > primenjuje se na listu
+# povecaj cenu svih producta sa title Java za 10%
+result = Product.update_alL("price = 1.1*price, "title like '%Java%'")
+
+
+save    > returns true if the record was saved; it returns nil otherwise.
+save!   > returns true if the save succeeded; it raises an exception otherwise.
+create  > returns the Active Record object regardless of whether it was suc-
+          cessfully saved. You’ll need to check the object for validation errors if you
+          want to dtermine whether the data was written.
+create! > returns the Active Record object on success; it raises an exception
+          otherwise.
+
+
+DELETE
+======
+delete() > single ID ili [id, id] i brise odgovarajuce rows u tabeli
+delete_all() > brise rows po odredjenom condition, ili sve redove ukoliko nije naznacen condition
+
+destroy() destroy_all() > slicno sto i gore, jedino sto ovi methodi FREEZE obj pa na njemu nije moguce vrsiti izmene posle.
+
+Ovi metodi brisu rows iz DB, dok sam obj(var) ostaje aktivan.
+
+Why do we need both the delete and destroy class methods?
+The delete methods bypass the various Active Record callback and validation functions,
+while the destroy methods ensure that they are all invoked.
+
+Preporuka je da se koristi destroy.
+
+
+MONITORING PROCESS
+==================
+Active Record controls the life cycle of model objects—it creates them, monitors
+them as they are modified, saves and updates them, and watches sadly as
+they are destroyed.
+
+
+CALLBACKS
+---------
+Omogucava nasem kodu da ucestvuju u monitoring procesu Railsa.
+
+AR ima 16 callbacks.
+
+14 before/after i 2 exceptiona:
+1. after_find > posle bilo koje find() operacije
+2. after_initialize > nakon sto se kreira AR obj
+
+╔═══════════════════════╦═══════════════════════╦═══════════════════╗
+║     Model.save()      ║     Model.update()    ║  Model.destroy()  ║
+╠═══════════════════════╬═══════════════════════╬═══════════════════╣
+║ NEW RECORD            ║ EXISTING RECORD       ║                   ║
+║                       ║                       ║                   ║
+║ before_validation     ║ before_validation     ║                   ║
+║ VALIDATION OPERATIONS ║ VALIDATION OPERATIONS ║                   ║
+║ after_validation      ║ after_validation      ║                   ║
+║                       ║                       ║                   ║
+║ before_save           ║ before_save           ║                   ║
+║ before_create         ║ before_update         ║ before_destroy    ║
+║ INSERT OPERATION      ║ UPDATE OPERATION      ║ DESTROY OPERATION ║
+║ after_create          ║ after_update          ║ after_destroy     ║
+║ after_save            ║ after_save            ║                   ║
+╚═══════════════════════╩═══════════════════════╩═══════════════════╝
+
+BEFORE/AFTER VALIDATION
+Oni prihvataju on: parametar koji omogucava ogranicenje validacije na odredjenu akciju u ctrl.
+npr:
+before_validation :check_login, on: [:create, :destroy]
+
+
+CALLBACK DEFINITION
+Najcesce se pise handler ili block.
+Naziv je simbol:  :check_login
+Ovi metodi su uvek private ili protected.
+Blockovi primaju Model obj kao parametar.
+
+Primer:
+
+class Order < ActiveRecord::Base
+  before_validation :normalize_credit_card_number
+
+  # Block, order je model obj
+  after_create do |order|
+    logger.info "Order #{order.id} created"
+  end
+
+  protected
+    def normalize_credit_card_number
+      self.cc_number.gsub!(/[-\s]/, '')
+    end
+end
+
+
+GROUPING CALLBACKS
+------------------
+
+Ovde se spominju i CONCERNS.
+
+Ukratko:
+If you have a group of related callbacks, it may be convenient to group them
+into a separate handler class. These handlers can be shared between multiple
+models. A handler class is simply a class that defines callback methods
+( before_save() , after_create() , and so on ). Create the source files for these handler
+classes in app/models.
+
+In the model object that uses the handler, you create an instance of this
+handler class and pass that instance to the various callback declarations.
+
+This method will receive a single parameter, the model object that
+generated the callback.
+
+
+PRIMER:
+# CALLBACK
+# /app/models/credit_card_callbacks.rb
+class CreditCardCallbacks
+  # Normalize the credit card number
+  def before_validation(model)
+    model.cc_number.gsub!(/[-\s]/, '')
+  end
+end
+
+# MODEL
+class Order < ActiveRecord::Base
+before_validation CreditCardCallbacks.new
+# ...
+end
+
+PRIMER ENCRYPTER:
+-----------------
+class Encrypter
+  # We're passed a list of attributes that should
+  # be stored encrypted in the database
+  def initialize(attrs_to_manage)
+    @attrs_to_manage = attrs_to_manage
+  end
+
+  # Before saving or updating, encrypt the fields using the NSA and
+  # DHS approved Shift Cipher
+  def before_save(model)
+    @attrs_to_manage.each do |field|
+      model[field].tr!("a-z", "b-za")
+    end
+  end
+
+  # After saving, decrypt them back
+  def after_save(model)
+    @attrs_to_manage.each do |field|
+      model[field].tr!("b-za", "a-z")
+    end
+  end
+
+  # Do the same after finding an existing record
+  alias_method :after_find, :after_save
+end
+
+# MODEL
+require "encrypter"
+
+class Order < ActiveRecord::Base
+  encrypter = Encrypter.new([:name, :email])
+
+  before_save encrypter
+  after_save encrypter
+  after_find encrypter
+
+  protected
+    def after_find
+    end
+end
+
+AFTER_FIND I AFTER_INITIALIZE METODI IMAJU POSEBAN TRETMAN.
+One of the consequences of this special treatment is that Active Record won’t
+know to call an after_find handler unless it sees an actual after_find() method in
+the model class. We have to define an empty placeholder to get after_find pro-
+cessing to take place.
+
+
+PRIMER ENCRIPTER 2 (Kraci)
+--------------------------
+# CALLBACK encrypt.rb
+class ActiveRecord::Base # BITNO!!! Ovako je dostupno svim AR modelima
+  def self.encrypt(*attr_names)
+    encrypter = Encrypter.new(attr_names)
+
+    before_save encrypter
+    after_save encrypter
+    after_find encrypter
+
+    define_method(:after_find) {  }
+  end
+end
+
+# MODEL
+class Order < ActiveRecord::Base
+  encrypt(:name, :email)
+end
+
+
+TRANSACTIONS
+============
+
+A database transaction groups a series of changes in such a way that either
+the database applies all of the changes or it applies none of the changes.
+
+Within the scope of a
+transaction, either every SQL statement succeeds or they all have no effect.
+Putting that another way, if any statement fails, the entire transaction has
+no effect on the database.
+
+Primer za transaction je finansijska transakcija.
+
+Transactions postoje u kontekstu DB konekcija one se pozivaju preko ActiveRecord klase.
+
+ActiveRecord.transaction do
+  account1.deposit(100)
+  account2.withdraw(100)
+end
+
+
+PRIMER TRANSAKCIJE (Detaljan)
+
+1. Table
+create_table :accounts, force: true do |t|
+  t.string :number
+  t.decimal :balance, precision: 10, scale: 2, default: 0
+end
+
+2. Model
+class Account < ActiveRecord::Base
+  validates :balance, numericality: {greater_than_or_equal_to: 0}
+
+  def withdraw(amount)
+    adjust_balance_and_save!(-amount)
+  end
+
+  def deposit(amount)
+    adjust_balance_and_save!(amount)
+  end
+
+  private
+    def adjust_balance_and_save!(amount)
+      self.balance += amount
+      save!
+    end
+end
+
+3. Transakcija kod
+peter = Account.create(balance: 100, number: "12345")
+paul = Account.create(balance: 200, number: "54321")
+
+Account.transaction do
+  paul.deposit(10)
+  peter.withdraw(10)
+end
+
+4. Ova operacija se izvrsava pravilno, medjutim ukoliko bi koristili npr vece iznose (koji ne bi prosli validaciju)
+   problem je u tome sto rails onemogucava promenu u DB ali objekat i dalje sadrzi pogresnu vrednost.
+
+   Knjiga nije dala dalja objasnjenja.
+
+
+TRANSACTIONS = ACID (Atomic, Consistency, Isolation, Durable)
+
+Active Record is smart enough to wrap all the updates and
+inserts related to a particular save() in a TRANSACTION.
+
+Ovo je najociglednije prilikom parent/children tabela, kada se vrse visestruke SQL komande.
+(has_many, belongs_to itd...)
+
+
+CONCERNS
+--------
+https://signalvnoise.com/posts/3372-put-chubby-models-on-a-diet-with-concerns
+
+PRIMER:
+# app/models/product.rb
+class Product
+  include Taggable
+  ...
+end
+
+# app/models/concerns/taggable.rb
+# notice that the file name has to match the module name
+# (applying Rails conventions for autoloading)
+module Taggable
+  extend ActiveSupport::Concern
+
+  included do
+    has_many :taggings, as: :taggable, dependent: :destroy
+    has_many :tags, through: :taggings
+  end
+
+  def tag_names
+    tags.map(&:name)
+  end
+
+  # methods defined here are going to extend the class, not the instance of it
+  module ClassMethods
+
+    def tag_limit(value)
+      self.tag_limit_value = value
+    end
+
+  end
+end
+
+
+
+ACTIONPACK
+==========
+
+ActionPack se sastoji iz 3 modula:
+1. ActionDispatch   - routes requests to ctrl
+2. ActionController - converts requests to responces
+3. ActionView       - used by ActionController to format responces
+
+
+ACTIONDISPATCH
+--------------
+
+At  its  simplest,  a  web  application  accepts  an  incoming  request  from  a
+browser, processes it, and sends a response.
+
+Q: How does it route these requests to appropriate code?
+
+Rails pruza 2 mogucnosti za route-ovanje requestova:
+1. Comprehensive way
+2. Convenient way
+
+1. direktno mapiranje URL ka akcijama u ctrl (pattern matching, requirements, conditions)
+2. definise routes kao resources
+
+Moguce je kombinovati oba vrste rails routes.
+
+Rails  encodes  information  in  the  request  URL  and  uses  a
+subsystem called Action Dispatchto determine what should be done with that
+request.
+
+
+REST
+----
+
+REpresentational State Transfer
+
+OBJASNJENJE:
+- In  a  REST  approach,  servers  communicate  with  clients using STATELESS connections.
+  All the information about the state of the interaction between the two is encoded into the
+  REQUESTS and RESPONSES between them.
+- Long-term state is kept on the server as a set of identifiable RESOURCES.
+- Clients access these resources using a well-defined (and severely constrained)
+  set  of  resource  identifiers  (URLs  in  our  context).
+
+
+KORISTI OD REST:
+1. First,  the  formalities  of  a  RESTful  approach  mean  that  network  designers
+know when and where they can cache responses to requests. This enables
+load  to  be  pushed  out  through  the  network,  increasing  performance  and
+resilience while reducing latency.
+
+Ovo nije bas detaljno objasnjeno, tako da mi nije najjasnije to za cachiranje
+
+2. Second,  the  constraints  imposed  by  REST  can  lead  to  easier-to-write  (and
+maintain) applications.
+
+
+Ukratko dolazi do spajanja URL sa HTTP methodama:
+HTTP METHODS = GET, PUT, PATCH, POST, DELETE
+
+# Komanda za listanje svih routes
+rake routes
+
+Lokacija u Rails za podesavanje ROUTES:
+# /config/routes
+
+
+PRIMER:
+PhotosController
++-----------+------------------+----------------+------------------------------------------+
+| HTTP Verb | Path             | Ctrl#Action    | Used for                                 |
++-----------+------------------+----------------+------------------------------------------+
+| GET       | /photos          | photos#index   | display list of photos                   |
++-----------+------------------+----------------+------------------------------------------+
+| GET       | /photos/new      | photos#new     | return html form for creating new photos |
++-----------+------------------+----------------+------------------------------------------+
+| POST      | /photos          | photos#create  | create a new photo                       |
++-----------+------------------+----------------+------------------------------------------+
+| GET       | /photos/:id      | photos#show    | display specific photo                   |
++-----------+------------------+----------------+------------------------------------------+
+| GET       | /photos/:id/edit | photos#edit    | return a html form for editing a photo   |
++-----------+------------------+----------------+------------------------------------------+
+| PATCH/PUT | /photos/:id      | photos#update  | update a specific photo                  |
++-----------+------------------+----------------+------------------------------------------+
+| DELETE    | /photos/:id      | photos#destroy | delete a specific photo                  |
++-----------+------------------+----------------+------------------------------------------+
+# :id se dobija putem params[:id]
+
+
+7 AKCIJA SE POKLAPA SA CRUD (Create Read Update Delete)
++ 2 akcije za forme za unos/editovanje (new, edit)
+
+
+DEFINISANJE RESOURCE
+--------------------
+
+resource :photos
+
+OPCIJE ZA FILTRIRANJE:
+:only [:create, :update]  >> Omogucava SAMO navedene routes
+:except [:new, :destroy]  >> Disabluje navede routes
+
+
+FORMAT SPECIFIER
+To je builtin za svaku route, omogucava responce za npr JS, XML
+/products(.:format)
+
+
+HELPERI:
+Neke route imaju built in helpere, to su XXX_URL i XXX_PATH.
+photos_url, edit_photos_url(id:1)
+
+users_url # => http://localhost:3000/users
+users_path  # => /users
+
+path is relative while url is absolute.
+The usage of _url is required in controller(server-side) and _path are engouh in the view(browser-end).
+
+
+RESPOND_TO
+Ovaj block se nalazi unutar ctrl i odredjuje tip responce od strane rails app.
+Npr. zelim da vratim js umesto html.
+
+respond_todo|format|
+  format.html{redirect_to products_url}
+  format.json{head:no_content}
+end
+
+
+ADDITIONAL ACTIONS
+Ukoliko zelimo da dodamo jos akcija u okviru resource:
+
+resources :products do
+  get :who_bought, on: :member
+end
+
+get         > http
+:who_bought > naziv
+on:         > :member ili :collection (single item ili lista)
+
+
+NESTED RESOURCE
+resources :products do
+  resources :reviews
+end
+
+#  /products/:product_id/reviews/:id
+>> URL:  /products/95/reviews/4
+>> NAME: product_review
+
+
+ROUTING CONCERNS
+Routes koje se mogu ponovo upotrebljavati unutar drugih resursa ili routes.
+Common behavior, short hand za :who_bought
+
+On a larger system there may be types of objects for which a reviewmay be
+appropriate or  to  which  a who_bought action  might  reasonably  be  applied.
+
+
+concern :reviewable do
+   resources :reviews
+end
+
+ili za who bought:
+concern :who_bought
+  get :who_bought, on: member
+end
+
+resources :products, concern: :reviewable
+resources :users, concern: :reviewable
+resources :client, concern: :who_bought
+
+
+SHALLOW ROUTE NESTING
+---------------------
+Ovo se koristi zbog toga sto nested routes nekad prave vrlo nepregledne/necitljive URL.
+Nije bas najbolje objasnjeno u knjizi ali fokus je verovatno na slucaj /reviews/2
+
+resources :products, shallow: true do
+  resources :reviews
+end
+
+/products/1          =>  product_path(1)
+/products/1/reviews  =>  product_reviews_index_path(1)
+/reviews/2           =>  reviews_path(2)
+
+Stackoverflow:
+I don't believe that Rails offers any built-in way to have the URLs use the full hierarchy (e.g. /projects/1/collections/2) but also have the shortcut helpers (e.g. collection_path instead of project_collection_path).
+
+If you really wanted to do this, you could roll out your own custom helper like the following:
+
+def collection_path(collection)
+  # every collection record should have a reference to its parent project
+  project_collection_path(collection.project, collection)
+end
+
+But that would be quite cumbersome to manually do for each resource.
+
+
+Medjutim malo je drugaciji primer u oficijelnoj rails doc.
+
+One way to avoid deep nesting is to generate the COLLECTION ACTIONS scoped under the parent,
+so as to get a sense of the hierarchy, but to not nest the MEMBER ACTIONS.
+
+resources :posts do
+  resources :comments, only: [:index, :new, :create]
+end
+resources :comments, only: [:show, :edit, :update, :destroy]
+
+# Isto sto i gornje
+resources :posts do
+  resources :comments, shallow: true
+end
+
+
+DATA REPRESENTATION (FORMAT)
+----------------------------
+One of the goals of a REST architecture is to decouple data from its representation.
+
+Primer rake route:
+GET /products(.:format)
+{:action=>"index",:controller=>"products"}
+
+(.:format) >> :format parametar omogucava podesavanje MIME type koji je returned
+
+Because a full stop (period) is a separator character in route definitions, :format
+is treated as just another field. Because we give it a nildefault value, it’s an
+optional field.
+
+Primer u CTRL:
+def show
+  respond_to do|format|
+    format.html
+    format.xml {renderxml:@product.to_xml}
+    format.yaml{rendertext:@product.to_yaml}
+  end
+end
+
+Po defaultu rails vraca HTML. (/store/show/1 > isto sto i /store/show/1.html)
+
+/store/show/1 >> html
+/store/show/1.html >> html
+/store/show/1.xml >> xml
+GET HTTP://testtest.com/store/show/123?format=xml >> HTTP request parameter
+
+
+CTRL ACTION METHODS
+-------------------
+
+REQUEST FLOW
+------------
+>> When a controller object processes a request, it looks for a public instance
+method  with  the  same  name  as  the  incoming  action.
+
+1. If  it  finds  one,  that method  is  invoked.
+
+2. If  it  doesn’t  find  one  and  the  controller  implements
+method_missing(), that method is called, passing in the action name as the first
+parameter and an empty argument list as the second.
+
+3. If no method can be called, the controller looks for a template named after the current controller
+and action.
+
+4. If found, this template is rendered directly.
+
+5. If none of these things happens, an AbstractController::ActionNotFounderror is generated.
+
+
+CONTROLLER ENVIROMENT
+---------------------
+The controller sets up the environment for actions (and, by extension, for the
+views  that  they  invoke).  Many  of  these  methods  provide  direct  access  to
+information contained in the URL or request.
+
+LISTA METHODA:
+
+action_name  =  name of action currently processed
+cookies =  cookie associated with request
+headers = HTTP header za response
+params = hash obj koji sadrzi sve request parametre
+session = hash obj koji sadrzi current session data
+logger = za custom .log poruke
+response = response obj
+request
+  > request_method : vraca req method (:delete, :get itd..)
+
+  > method : isto sto i gornje, osim sto ima drugaciji :head?
+
+  > delete?, get? head? post?, put? : provera da methoda
+
+  > xml_http_request? ili xhr? : AJAX
+
+  > url : full URL for request
+
+  > protocol, host, port, path, query_string : komponente URL po patternu
+            protocol://host:port/path?query_string
+
+  > domain : poslednje 2 stavke domain name
+
+  > host_with_port : host:port za request
+
+  > port_string : :port (80 HTTP, 443 HTTPS)
+
+  > ssl? : ssl req odnosno HTTPS
+
+  > remote_ip : returns remote IP as a string
+
+  > env : enviroment, values set by browser > request.env['HTTP_ACCEPT_LANGUAGE']
+
+  > accepts : Mime:Type niz objekata iz Accepet headera
+
+  > format : on se generise na osnovu Accept headera, ima Mime::HTML kao fallback
+
+  > content_type : MIME of request
+
+  > headers : HTTP header compelete set
+
+  > body : request body I/O stream
+
+  > content_length : number of bytes in body
+
+
+
+RESPONDING TO USER
+------------------
+4 nacina za response:
+
+1. Render template (View)
+2. Return string (npr za error)
+3. Return nothing (npr za AJAX) i dalje vraca HTTP header jer je to neophodno
+4. Send other data (npr PDF)
+
+CTRL UVEK IZVRSAVA 1 RESPONSE PO 1 REQUEST.
+(To znaci da render, redirect_to, send se mogu pozvati samo jednom,
+ili dolazi do DoubleRenderError exception)
+
+U RAILS PROCES RESPONSA IDE OVAKO:
+CTRL proverava da li je postoji KREIRAN response odmah nakon sto je zavrsio sa
+handling of request. U slucaju da ne postoji custom response CTRL auto
+renderuje template sa nazivom controlera/action.
+Ovo znaci da nemora da se explicitno poziva render u Rails
+
+Mozemo imati vise template sa istim imenom ali RAZLICITOM extension).
+Ukoliko ne naglasimo extenziju u renderu Rails pretpostavlja html.erb
+
+
+TEMPLATES
+---------
+
+Template je fajl koji definise sadrzaj responsa.
+Rails podrzava 3 templating formata out-of-box:
+erb > Embedded Ruby (HTML)
+builder > XML
+RJS > JS
+
+Jos u upotrebi:
+coffee > JS
+scss > SASS
+atom > RSS
+
+
+Lokacija:
+app/views/controller/action.type.xxx (type = html ...  / xxx erb, scss coffee)
+
+RENDER
+------
+Najznacajni method za view u Rails.
+
+render >
+bez parametara renderuje default template za current ctrl#action
+
+Takodje default ponasanje za CTRL je da poziva render()
+
+class BlogController < ApplicationController
+  def index
+    render
+  end
+end
+
+# Isto sto i gornje
+class BlogController < ApplicationController
+  def index
+  end
+end
+
+
+render(text: string) >
+salje text client (nema interpretacije ili HTML escaping)
+
+class HappyController < ApplicationController
+  def index
+    render(text: "Hello there!")
+  end
+end
+
+render (inline: string, [type: "erb|builder|coffee|scss"], [locals: hash]) >
+Interpretira string kao izvor za template odredjenog tipa.
+Local omogucava kreiranje var
+
+class SomeController < ApplicationController
+
+  if RAILS_ENV == "development"
+
+    def method_missing(name, *args)
+      render(inline: %{
+        <h2>Unknown action: #{name}</h2>
+        Here are the request parameters:<br/>
+        <%= debug(params) %> })
+    end
+  end
+end
+
+render(action: action_name) >
+Renderuje template za datu akciju ctrl
+
+ON NE POZIVA ACTION METHOD VEC SAMO RENDERUJE TEMPLATE
+
+render(template: name, [locals: hash]) >
+Renders a template and arranges for the resulting text to be sent back to
+the client. ???
+
+def index
+  # "ctrl/action"
+  render template: "blog/short_list"
+end
+
+render(file: path) >
+Renders a view that may be entirely outside of your application.
+
+render(partial: name, ...) >
+Partial template
+
+render(nothing: true)
+Returns empty body to browser
+
+render(xml: stuff)
+Renderuje stuff kao text, content-type  applicatoin/xml
+
+render(json: stuff, [callback: hash])
+stuff kao JSON, content-type application/json.
+:callback wrapuje rezultat u named function
+
+render(:update) do |page| ... end
+RJS template
+
+
+Sve varijante render() uzimaju opcione parametre:
+:status       > status header HTTP in response (default: "200 OK")
+:layout       > da li se koristi layout za rezultat rendera
+:content_type > custom content-type HTTP header
+
+
+SENDING FILES/DATA
+------------------
+Obicno su u pitanju fajlovi ali nije obavezno.
+
+
+SEND_DATA
+
+Sends a string containing binary data to the client.
+
+send_data(data, options...)
+
+def sales_graph
+  png_data = Sales.plot_for(Date.today.month)
+  send_data(png_data, type: "image/png", disposition: "inline")
+end
+
+:disposition > inline - display, attachment - default,  dload & save
+:filename    > default file name za browser when saving
+:status      > status code "200 OK"
+:type        > content type, default: application/octet-stream
+:url_based_filename > sprecava Rails da ponudi default ime za neki fajl
+                      u Content-Disposition headeru (ovo je vise zbog browser compatibilnosti)
+
+------------------------------
+
+SEND_FILE
+
+send_file(path, options..)
+
+OVAJ METHOD PODESAVA SLEDECE HEADERE:
+Content-Length
+Content-Type
+Content-Disposition
+Content-Transfer-Encoding
+
+Options:
+:buffer_size |number| >> kolicina bytes koja se salje sa svakim write streamom
+:dispostion  |string| >> inline / attachment
+:filename    |string| >> predlozeno ime za fajl
+:status      |string| >> status code
+:stream      |true ili false | >>
+              false, ceo fajl se ucitava u server memory i salje clientu
+              true, streamuje se i salje u komadima
+:type        |string| >> content type, default: application/octet-stream
+
+
+OBA SEND_ METHODA OMOGUCAVAJU PODESAVANJE DODATNIH HEADER OPCIJA:
+send_file("/files/secret_list")
+headers["Content-Descrption"] = "Top secret"
+
+
+
+REDIRECTS
+---------
+HTTP redirect se salje od strane servera clientu kao odgovor na neki request.
+"Im done processing this request, and you should go here to see the results"
+
+The redirect response includes a URL that the client should
+try next along with some status information saying whether this redirection
+is permanent (status code 301) or temporary (307).
+
+Iz perspektive browsera redirectovi od servera se tretiraju/ponasaju isto kao
+kada bi end user uneo URL rucno.
+
+Rails applikacije koriste redirect da bi preneli obradu nekog requesta
+ka nekoj drugoj akciji.
+
+TIP:
+Opisan je u knjizi primer(add_comment) kada je umesto redirect_to upotrebljen render.
+TU je opisan problem da kada user udari refresh URL ostaje isti, i tako browser umesto
+da osvezi listu commentara dodaje novi komentar.
+
+URL_FOR >> Neki rails method koji generise URL
+
+REDIRECT_TO OPTIONS
+redirect_to(action: ...options)
+
+redirect_to(path)
+If the path does not start with a protocol (such
+as http:// ), the protocol and port of the current request will be prepended.
+
+redirect_to(:back)
+Redirect ka URL iz HTTP_REFERER (prethodni)
+
+
+RAILS SESSIONS
+--------------
+A Rails session is a hash-like structure that persists across requests.
+Za razliku od cookies, session moze da sadrzi bilo koje objekte.
+(To ih cini idealnim za cuvanje state of app)
+
+NPR:
+U depot app koriscen je session da se cuva shoping cart.
+
+Pitanje:
+Gde se tacno cuvaju session izmedju requestova?
+Default opcija za Rails 4 je da se salju kod clienta u vidu cookies.
+Ti cookies su po defaultu enkriptovani, imaju size limit.
+
+FUNKCIONISANJE CUVANJA PODATAKA NA SERVERU:
+1. Rails generise 32-hex key.
+On se zove SESSION ID (random je). Rails cuva Session ID u cookie( pod key _session_id )
+u user browseru. Nakon toga rails lako moze da preuzme te podatke od istog korisnika.
+
+2. Rails skladisti sve session podatke na serveru, indexirane po _session_id.
+Kada stigne novi request, Rails prvo pretrazuje taj data store po session id.
+Pronadjeni podatak je SERIJALIZOVAN Ruby objekat.
+Nakon toga vrsi se deserijalizacija  cije se rezultati cuvaju u ctrl session atributu.
+Ovi podaci su sada dostupni app za dalju obradu.
+Nakon zavrsene obrade Rails ponovo upisuje nove podatke u session data store.
+
+STA SVE MOZE DA SE CUVA U SESSION?
+Ukratko skoro sve osim I/O objekata (fajlova)
+Bitno je da taj obj moze da se serijalizuje upotrebom Ruby Marshal methode.
+
+MARSHALING
+The marshaling library converts collections of Ruby objects into a byte stream, allowing them to be stored outside the currently active script. This data may subsequently be read and the original objects reconstituted.
+
+Cookies size limit = 4kb
+
+Da bi se koristio neki Rails model u session mora se dodati linija u ctrl:
+(ukoliko se taj model koristi u vise ctrl normalno je dodati ga u application_controller)
+Class BlogController < ApplicationControllre
+  model :user
+
+Sta ne treba cuvati:
+1. Masivni obj, bolje je koristi reference ka DB
+2. volatile obj (promenljivi) - npr ukupan broj clanaka, to nece raditi ispravno jer ukoliko
+   neki drugi user doda novi on nece biti osvezen ispravno u session (za svakog je pojedinacan)
+3. Criticne info, vazne podatke
+
+PROBLEMI:
+Ukoliko sacuvamo obj u session, sl. put kada korisnik pristupi app Rails ucitava taj obj iz session.
+Problem nastaje ukoliko je taj obj u medjuvremenu izmenjen/updatovan.
+
+Postoji 3 resenja za dati problem: (u knjizi su samo spomenuta bez primera)
+1. Cuvanje obj u DB, i referenciranje istog kroz ID session
+2. Brisanje svih session data sa servera svaki put kad se dogodi promena klase.
+3. Kompleksno resenje: dodavanje broja za verziju u session i promena istog kod svake promene.
+   Podesiti app tako da se ucitavaju podaci iskljucivo za current verziju app.
+
+
+Za kraj. Cak i ukoliko ne zelimo session u nasoj app nema potrebe za disablovanje istih jer ih
+Rails LAZY LOADUJE. (tj. on ih ucitava u memory tek u trenutku kada su neophodne)
+
+
+SESSION STORAGE OPCIJE
+----------------------
+session_store attribut iz ActionController::Base
+On se podesava u ActiveSupport::Cache::Store modulu.
+
+Opcije:
+1. session_store = :cookie_store
+   Default za R4 (Marshaling, cookie)
+
+2. session_store = :active_record_store
+   activerecord-session_store GEM, cuva session data u DB
+3. session_store = :drb_store
+   DRb is a protocol that allows Ruby processes to share objects over a net-
+   work connection. Using the DRbStore database manager, Rails stores
+   session data on a DRb server (which you manage outside the web appli-
+   cation). Multiple instances of your application, potentially running on
+   distributed servers, can access the same DRb store.
+
+4. session_store = :mem_cache_store
+   Kompleksan sistem koji koristi memcached (distributed object caching system)
+
+5. session_store = :memory_store
+   Cuva sve podatke u serverskoj memoriji (ovo se ne preporucuje za Rails)
+
+6. session_store = :file_store
+   Svi session podaci se cuvaju u fajlvoima na serveru. Za rails nije dobro.
+
+PREPORUKE:
+If we rule out memory store as being too simplistic, file store as too restrictive,
+and memcached as overkill, the server-side choices boil down to CookieStore,
+Active Record store, and DRb-based storage. Should you need to store more
+in a session than you can with cookies, we recommend you start with an
+Active Record solution. If, as your application grows, you find this becoming
+a bottleneck, you can migrate to a DRb-based solution.
+
+SESSION STORE CLEANUP
+---------------------
+Jedan od problema svih session server side storage je neophodnost maintenannce i cleanup.
+
+Jos jedan razlog za cleanup je zbog toga da app ne zeli da session traje forever.
+Npr. korisnik treba da ostene logovan odredjeno vreme, ukoliko je neaktivan neki period
+auto se brise session i korisnik je logout.
+
+Preporuka za EXPIRE SESSION:
+Brisanje server side store za odredjeni session.
+
+Primer za ActiveRecord (SQL):
+delete from session
+  where now() - updated_at > 3600;
+
+Postoji i reset_session() koji brise nepotrebne sessions. (nije objasnjeno detaljno)
+
+
+FLASH MESSAGE
+=============
+Mehanizam:
+When we use redirect_to() to transfer control to another action, the browser
+generates a separate request to invoke that action. That request will be han-
+dled by our application in a FRESH INSTANCE of a controller object—instance
+variables that were set in the original action are NOT available to the code
+handling the redirected action. But sometimes we need to communicate
+between these two instances. We can do this using a facility called the flash.
+
+Flash je privremeni obj, organizovan kao hash i cuva se u session.
+Specijalni property je taj da flash podesen prilikom procesuiranje requesta,
+vazi i prilikom procesuiranje sledeceg requesta. Nakon tog drugo requesta on se brise.
+Primer: create#action > flash[:success] = "Created user" >> na index#action poruka se prikazuje
+>> ali vec kada user klikne na neku drugu stranu/action u index flash poruka se brise.
+
+FLASH.NOW
+Ponekad je korisno koristiti flash za prosledjivanje poruka u current action i template.
+Tada koristimo flash.now koji generise poruku ali je ne cuva u session.
+
+FLASH.KEEP
+Poruka se cuva jos jedan request duze nego uobicajeno (3).
+Bez parametara cuva se neodredjno vreme.
+
+
+CALLBACKS:
+==========
+Before/after action
+Korisno za authentication, logging, itd..
+
+Rails podrzava 3 vrste callbacks:
+1. before
+2. after
+3. around
+
+Oni formiraju chain. Rails generise 2 chaina za svaku akciju u ctrl (before/after).
+
+Callback declarations also accept blocks and the names of classes. If a block
+is specified, it will be called with the current controller as a parameter. If a
+class is given, its filter() class method will be called with the controller as a
+parameter.
+
+OPCIJE ZA OGRANICENJE PO ACTION:
+only: [:new, :create]
+except: [:delete]
+
+MODIFIKOVANJE CHAIN ZA CALLBACKS:
+prepend_before_action >> ide pre callbacka
+prepend_after_action  >> ide posle callbacka
+
+AROUND
+------
+Uprosceno:
+Omogucava sledecu strukturu:
+pre > yield > posle
+
+Ima jos objasnjenja ali nisu dati primeri
+
+
+CALLBACK INHERITANCE
+--------------------
+Ukoliko napravimo subclass nekog ctrl ta subclass nasledjuje i callbacks.
+(Callback se pokrecu i kod parent i kod child)
+
+Ukoliko ne zelim da pokrecem odredjeni callback na CHILD koriste se:
+skip_before_action
+skip_after_action
+
+skip_action  # preskoci bilo koji action po imenu (sve jedno je da li je before/after/around)
+
+
+
+ACTION VIEW
+===========
+
+LOCATION
+--------
+app/views/ctrl_name/action
+
+render u okviru ctrl action po defaultu poziva odgovarajuci template iz view.
+
+Renderovanje template van konvencije:
+render(action: 'fake_action_name')
+render(template : 'controller/name')
+render(file: 'dir/template')
+
+
+TEMPLATE ENVIROMENT
+-------------------
+
+Template sadrzi kombinaciju fixnog texta i koda.
+
+1. Sve instance @var iz ctrl su dostupne template
+2. flash, headers, logger, params, request, response, session su takodje dostupne.
+   Ali one ne bi trebalo da se koriste u view. Korisne su za debugging.
+   <h4>Session</h4>  <%= debug(session) %>
+   <h4>Params</h4>   <%= debug(params) %>
+   <h4>Response</h4> <%= debug(response) %>
+3. Current ctrl obj je dostpuan uz pomoc attributa CONTROLLER. Ovo omogucava da template
+   poziva bilo koji PUBLIC method iz controlera.
+4. Path za base dir od template: base_patho
+
+
+TYPES
+-----
+1. Builder      > XML | .xml.builder
+2. CoffeeScript > JS  |
+3. ERB          > HTML
+4. SCSS         > CSS
+
+
+FORMS
+-----
+
+Primer:
+
+<%= form_for(:model) do |form| %>
+<p>
+  <%= form.label :input %>
+  <%= form.text_field :input, :placeholder => 'Enter text here...' %>
+</p>
+<p>
+  <%= form.label :address, :style => 'float: left' %>
+  <%= form.text_area :address, :rows => 3, :cols => 40 %>
+</p>
+<p>
+  <%= form.label :color %>:
+  <%= form.radio_button :color, 'red' %>
+  <%= form.label :red %>
+  <%= form.radio_button :color, 'green' %>
+  <%= form.label :green %>
+  <%= form.radio_button :color, 'blue' %>
+  <%= form.label :blue %>
+</p>
+
+<p>
+  <%= form.label 'condiment' %>
+  <%= form.check_box :ketchup %>
+  <%= form.label :ketchup %>
+  <%= form.check_box :mustard %>
+  <%= form.label :mustard %>
+  <%= form.check_box :mayonnaise %>
+  <%= form.label :mayonnaise %>
+</p>
+
+<p>
+  <%= form.label :priority %>
+  <%= form.select :priority, (1..10) %>
+</p>
+
+<p>
+  <%= form.label :start %>
+  <%= form.date_select :start %>
+</p>
+
+<p>
+  <%= form.label :alarm %>
+  <%= form.time_select :alarm %>
+</p>
+<% end %>
+
+
+f.label >
+associate text with input field
+def name: attribute name
+Custom:
+f.label 'Naziv custom', :attr_inputa
+
+f.text_field / f.text_area >
+single line ili multiline input.
+placeholder: default vrednost (html5)
+
+HTML5:
+search_field, telephone_field, url_field, email_field, number_field, range_field
+Sve oni su auto fallback na obican <input> ukoliko browser ne podrzava html5
+
+hidden_field >
+koristi se najcesce za prenos podataka (npr rails koristi za odredjene HTTP requestove)
+
+password_field >
+
+
+PROCESSING FORM
+---------------
+
+FLOW:
+1. App prima zahtev za editovanjem usera. Ucitava podatke u @user.
+  def edit
+    @user = User.find(params[:id])
+  end
+
+2. Poziva se edit.html.erb template gde se vrsi zamena neophodnih dinamickih info.
+  <%= form_for :user, :url => { :action => 'save', :id => @user } do |f| %>
+    <%= f.text_field 'name' %>
+    <%= f.text_field 'country' %>
+    <%= f.password_field 'password' %>
+  <% end %>
+
+3. HTML se renderuje i salje ka browseru.
+  <form action="/myapp/save/1234" >
+    <input name="user(name)" ... >
+    <input name="user(country)" ... >
+    <input name="user(password)" ... >
+
+4. Parametri (unos korisnika) se extraktuje u nested hash.
+  @params = { :id => 1234, :user => { :name => 'Miki', :country => 'Zemlja', :password => '' } }
+
+5. Save action koristi params da bi pronasla user record iz db i updateovala ga.
+  def save
+    user = User.find(params[:id])
+    if user.update_attributes(params[:id])
+      ....
+
+FORM PARAMS      >>    PARAMS
+id=123           || { id: "123" }
+user[name]=Dave  || { id: "123" }
+user[address][city]=Bgd  || { user: { address: { city: 'Bgd' } }
+
+
+FILE UPLOAD
+-----------
+U HTTP fajlovi se uploaduju uz pomoc multipart/form-data POST message.
+<input type="file">
+
+PRIMER:
+
+*MIGRACIJA
+----------
+class CreatePictures < ActiveRecord::Migration
+  def change
+    create_table :pictures do |t|
+      t.string :comment
+      t.string :name
+      t.string :content_type
+      t.binary :data, :limit => 1.megabyte
+    end
+  end
+end
+
+*CTRL GET
+---------
+class UploadController < ApplicationController
+  def get
+    @picture = Picture.new
+  end
+
+  # . . .
+  private
+  # Never trust parameters from the scary internet, only allow the white
+  # list through.
+  def picture_params
+    params.require(:picture).permit(:comment, :uploaded_picture)
+  end
+end
+
+*VIEW
+-----
+get.html.erb
+<%= form_for (:picture, url: { action: 'save' }, html: {multipart: true}) do |f| %>
+   Comment: <%= form.text_field('comment') %><br>
+   Upload your picture: <%= form.file_field('uploaded_picture') %><br> # NEMA OVOG POLJA U DB
+
+   <%= submit_tag 'Upload file' %>
+ <% end %>
+
+*MODEL
+------
+ class Picture < ActiveRecord::Base
+   validates_format_of :content_type,
+                       with: /^image/,
+                       message: "must be a picture"
+
+   # ACCESSOR, ON PRIMA POLJE UPLOADED_PICTURE IZ VIEW
+   def uploaded_picture=(picture_field)
+     self.name         = base_part_of(picture_field.original_filename)
+     self.content_type = picture_field.content_type.chomp
+     self.data         = picture_field.read
+   end
+
+   def base_part_of(file_name)
+     File.basename(file_name).gsub(/[^\w._-]/, '')
+   end
+ end
+
+*CTRL SAVE
+----------
+upload_controller
+def save
+  @picture = Picture.new(picture_params)
+  if @picture.save
+    redirect_to action: 'show', id: @picture.id
+  else
+    render action: 'get'
+  end
+end
+
+*CTRL /upload/picture/1234, Posebna akcija za prikaz slike
+------------------------------------------
+upload_controller
+def picture
+  @picture = Picture.find(params[:id])
+  send_data(@picture.data,
+            filename: @picture.name,
+            type: @picture.content_type,
+            disposition: "inline")
+end
+
+*CTRL Show
+----------
+upload_controller
+def show
+  @picture = Picture.find(params[:id])
+end
+
+VIEW SHOW
+---------
+show.html.erb
+<h3><%= @picture.comment %></h3>
+
+<img src="<%= url_for(:action => 'picture', :id => @picture.id) %>" />
+
+# Ovde je glavna upload#picture action za prosledjivanje podataka
+
+
+# PLUGINOVI ZA ATTACHMENT
+paperclip ili attachment_fu
+
+
+HELPERS
+-------
+Modul koji sadrzi methods koji se koriste u view.
+Vise su orijentisani na output (HTML)
+
+Lokacija:
+app/helpers/
+
+application_helper.rb > global
+naziv_ctrl_helper.rb  > svaki ctrl dobija svoj helper file
+
+Npr:
+
+HTML
+<h3><%= @page_title || "Naslov je ovaj" %></h3>
+
+HELPER
+module StoreHelper
+  def page_title
+    @page_title || "Naslov je ovaj"
+  end
+
+UPDATE HTML
+<h3><%= page_title %></h3>
+
+
+BUILDIN HELPERS
+---------------
+<%= number_to_currency(123.45) %>
+$123.45
+
+<%= number_to_currency(234.56, unit: "CAN$", precision: 0) %>
+CAN$235
+
+<%= number_to_human_size(123_456) %>
+120.6 KB
+
+<%= number_to_percentage(66.66666) %>
+66.667%
+
+<%= number_to_percentage(66.66666, precision: 1) %>
+66.7%
+
+<%= time_ago_in_words(Time.local(2012, 12, 25)) %>
+7 months
+
+%= number_with_delimiter(12345678) %>
+%12,345,678
+
+%<%= number_with_delimiter(12345678, delimiter: "_") %>
+%12_345_678
+
+%<%= number_with_precision(50.0/3, precision: 2) %>
+%16.67
+
+
+DEBUG
+-----
+KOristan method koji prikazuje vrednost nekog var u YAML formatu.
+Auto ih escape-uje tako da se mogu prikazati u HTML stranama.
+
+<%= debug(params) %>
+--- !ruby/hash:HashWithIndifferentAccess
+name: Dave
+language: Ruby
+action: objects
+controller: test
+
+
+TEXT HELPERS
+------------
+<%= simple_format(@trees) %>
+  Formats a string, honoring line and paragraph breaks. You could give it
+  the plain text of the Joyce Kilmer poem Trees, and it would add the HTML
+  to format it as follows.
+
+  <p> I think that I shall never see <br />A poem lovely as a tree.</p> <p>A
+  tree whose hungry mouth is prest <br />Against the sweet earth’s flowing
+  breast; </p>
+
+<%= excerpt(@trees, "lovely", 8) %>
+  ...A poem lovely as a tre...
+
+<%= highlight(@trees, "tree") %>
+  I think that I shall never see A poem lovely as a <strong class="high-
+  light">tree</strong>. A <strong class="highlight">tree</strong> whose
+  hungry mouth is prest Against the sweet earth’s flowing breast;"
+
+<%= truncate(@trees, length: 20) %>
+  I think that I sh...
+
+<%= pluralize(1, 'person') %> but <%= pluralize(2, 'person') %>
+  1 person but 2 people
+
+
+LINKING TO
+----------
+
+ActionView::Helpers::AssetTagHelper / Action::View::UrlHelper
+Sadrze methode za referencijranje externi resursa u template.
+
+LINK_TO
+Najkorisceniji method za linkovanje.
+<%= link_to 'Naziv linka', new_comments_path %>
+
+Opcioni parametri:
+<%= link_to 'Delete product', product_path(@product),
+      { class: 'dangerous', method: 'delete' } %>
+
+:method >> omogucava podesavanje HTTP requesta (default je GET), radi uz pomoc JS
+
+:data   >> custom data attributes, npr JS confirmacija pre redirectovanja:
+           data: { confirm: 'Are you sure?' }
+
+button_to >> slicno sto i link_to ali generise dugme, ima par ogranicenja vezanih za pozicioniranje i css (nemogu biti inline)
+
+
+CONDITIONAL:
+link_to_if()
+link_to_unless
+
+link_to_unless_current(action.capitalize, action: action) >> izvrsi akciju samo ukoliko se current action,
+      poklapa sa action: parametrom.
+
+
+current_page() >>
+
+url_for / link_to >> mogu i sa absolute path: link_to("Help", "http://my.site/help/index.html")
+
+
+IMAGE LINK
+<%= image_tag("/assets/dave.png", class: "bevel", size: "80x120") %>
+<%= image_tag("/assets/andy.png", class: "bevel",
+      width: "80", height: "120") %>
+Rails pretpostavlja da se sve slike nalaze u app/assets/images.
+
+Moguca je i kombinacija link_to sa image_tag:
+<%= link_to(image_tag("delete.png", size: "50x22"),
+              product_path(@product),
+              data: { confirm: "Are you sure?"  },
+              method: :delete)
+%>
+
+
+MAIL
+<%= mail_to("support@pragprog.com", "Contact Support",
+              subject: "Support question from #{@user.name}",
+              encode: "javascript") %>
+Ovde jedino da se napomene :encode  parametar gde se uz pomoc 'javascript' vrsi generisanje
+random linka kako ih web spideri ne bi mogli harvestovati i uzeti email adresu.
+
+
+ASSET TAG MODULE
+----------------
+Sadrzi helpere za js i css.
+
+<%= stylesheet_link_tag "application", media: "all", "data-turbolinks-track" => true %>
+<%= javascript_include_tag "application", "data-turbolinks-track" => true %>
+<%= csrf_meta_tags %>
+
+Ovo je verovatno najbolje objasnjeno u Rails Asset pipeline iz Rails Guide.
+Ima tu par specificnih opcija i nacina na koji se ucitavaju, kompajliraju.
+
+Rails podrazumeva da se sav css/js nalazi u app/assets/javascript i /stylesheets
+Ovo je moguce promeniti sa, u config/:
+config.action_controller.asset_host = "http://lokacija.com/fajlova"
+
+
+LAYOUTS & PARTIALS
+------------------
+
+LAYOUTS
+Render pages that are nested in other rendered pages.
+Npr. napraviti centralni layout file i na njega ubacivati sve iz action template.
+
+#LAYOUT FILE
+<html>
+<head>
+  <title>Form: <%= controller.action_name %></title>
+  <%= stylesheet_link_tag 'scaffold' %>
+</head>
+<body>
+  <%= yield :layout %> # Ubacivanje action template
+</body>
+</html>
+
+
+YIELD
+Ovo je method koji vrsi ubacivanje templata u layout file.
+Po defaultu uvek se poziva :layout (moze i da se izostavi i da pise samo yield u tom slucaju)
+
+Svi layouts su CTRL specific sto znaci da svaki ctrl moze da ima svoj layout file.
+
+FLOW:
+Rails za npr ctrl Store trazi  store.html.erb u app/views/layouts. Ukoliko ne pronadje takav file,
+onda se auto poziva app/views/layouts/application.html.erb koji se primenjuje za SVE ctrl koji nemaju definisan layout file.
+
+Ovo ponasanje se moze overrideovati sa:
+class StoreController < ApplicationController
+
+  layout 'standard' # postoje only i expect parametri
+  ...
+
+DINAMICKI LAYOUT
+Primer dinamickog menjanja layouta u zavisnosti od konteksta: (u slucaju da je zatvoren store promeni layout)
+class StoreController < ApplicationController
+  layout :determine_layout
+  # ...
+  private
+    def determine_layout
+      if Store.is_closed?
+        "store_down"
+      else
+        "standard"
+      end
+    end
+end
+
+RENDER LAYOUT
+Moguce je u okviru kontrolera prilikompozivanja render overwriteovati layoute:
+render(layout: false)
+render(layout: 'layouts/sample')
+
+DATA
+----
+Layout imaju pristup svim podacima koje su dostupne i templateima.
+Sve @var koje su definisane u normal template su dostupne i u layout.
+(to je zbog toga sto se prvo vrsi rendering template pa se onda poziva layout)
+
+Primer za local @var:
+# LAYOUT
+<html>
+  <head>
+    <title><%= @title %></title>
+    <%= stylesheet_link_tag 'scaffold' %>
+  </head>
+  <body>
+    <h1><%= @title %></h1>
+    <%= yield :layout %>
+  </body>
+</html>
+
+# TEMPLATE
+<% @title = 'Ovo je naslov' %>
+<p> Blablalbalbla </p>
+<p> Jos random gluposti </p>
+
+CONTENT_FOR
+-----------
+Omogucava da se iz templata proslede podaci za layout.
+Block iz content_for se NE renderuje u okviru template.
+
+For example, different templates may need to add their own template-specific
+items to the standard page sidebar.
+
+# TEMPLATE
+<h1>Regular Template</h1>
+
+<% content_for(:sidebar) do %>
+  <ul>
+    <li>this text will be rendered</li>
+    <li>and saved for later</li>
+    <li>it may contain <%= "dynamic" %> stuff</li>
+  </ul>
+<% end %>
+
+<p>
+Here's the regular stuff that will appear on
+the page rendered by this template.
+</p>
+
+# LAYOUT
+<!DOCTYPE .... >
+<html>
+<body>
+  <div class="sidebar">
+    <p>
+    Regular sidebar stuff
+    </p>
+
+    # ovde se ubacuje iz content_for
+    <div class="page-specific-sidebar">
+      <%= yield :sidebar %>
+    </div>
+  </div>
+</body>
+</html>
+
+Moze da se koristi i za JS/css.
+
+_PARTIALS
+---------
+
+Partial-page templates
+
+Koriste se za prikazivanje delova View koji se ponavlja.
+Npr za iteme iz shopping carta.
+
+Oni se nalaze unutar nekog template i pozivaju se jedan/vise puta,
+prilikom cega oni renderuju _partial za sve stavke iz nekog obj.
+
+Primer:
+_PARTIAL
+<div class="article">
+  <div class="articleheader">
+    <h3><%= article.title %></h3>
+  </div>
+  <div class="articlebody">
+    <%= article.body %>
+  </div>
+</div>
+
+# Template
+<%= render(partial: 'article', object: @an_object) %>
+
+OBJASNJENJE:
+File: _ime.html.erb
+
+Pozivanje: poziva se ime partiala bez extenzije i _ > render partial: ime
+
+Obj: oznacava koji je obj prosledjen u partial
+     This object will be available within the template via a local variable
+     with the same name as the template.
+
+     Iz gornjeg primera: @an_object ce u partial biti pozvan za article.
+
+Locals: MOguce je proslediti dodatne lokalne promenljive
+        render partial: 'article', object: @an_article,
+               locals: { authorized_by: session[:user_name], from_ip: request.remote_ip }
+
+
+PARTIALS COLLECTION
+-------------------
+Najcesce se partiali koriste za renderovanje kolekcije raznih vrsta entries. (npr blog article, store items itd..)
+
+Za to se koristi collection parametar koji primenljuje _partial na svakog clana kolekcije pojeidnacno:
+render partial: 'article', collection: '@article_list'
+
+U okviru partila article var ce biti podesen na TRENUTNO aktivan item iz kolekcije.
+Takodje postoji i var article_counter(xxx_counter) koji ima vrednost podesenu na index trenutno aktivnog itema.
+
+Postoji i parametar :space_template, to je poseban template koji ce se koristiti izmedju svakog itema iz kolekcije.
+Npr.
+
+# Template poziv za partial
+<%= render(partial: "animal", collection: %w{ ant bee cat dog elk  },
+           spacer_template: "spacer")
+%>
+
+# _partial
+<p>Ovo je zivotinja <%= animal %></p>
+
+# _spacer
+<hr/>
+
+# Rezultat
+Ovo je zivotinja ant
+-------------------- (ovo predstavlja html hr)
+Ovo je zivotinja bee   ITD..
+
+
+SHARED TEMPLATES
+----------------
+Rails assumes that the TARGET TEMPLATE is in the current controller’s view directory.
+If the name contains one or more / characters, Rails assumes that
+the part up to the last slash is a directory name and the rest is the template
+name.
+The directory is assumed to be under app/views . This makes it easy to
+share partials and subtemplates across controllers.
+
+Konvencija u Rails je da se shared partials cuvaju u app/views/shared.
+Tako se mogu pozivati _partiali iz bilo kog ctrl/view.
+
+<%= render("shared/header", locals: {title: @article.title}) %>
+<%= render(partial: "shared/post", object: @article) %>
+
+
+Partials takodje mogu imati i layout:
+render partial: 'user', layout: 'administrator'
+
+Layout ovde moze da se ubaci u BLOCK uz bilo koji template:
+<%= render layout: "administrator" do %>
+# ...
+<% end %>
+
+Partial layouts are to be found directly in the app/views directory associated
+with the controller, along with the customary underbar prefix, such as
+app/views/users/_administrator.html.erb .
+
+
+
+MIGRATIONS
+==========
+
+Lokacija: db/migrate
+
+File: 200411021234_create_products.rb
+
+Generator: rails generate migration add_price_column
+
+Rake: rake db:migrate
+
+Funkcionisanje:
+Migracije generisu tabelu schema_migrations u okviru svake Rails app DB.
+Ona sadrzi samo jednu column - version, i po jedan row za svaku uspesno applied migration.
+
+1. rake db:migrate > prvo trazi schema_migration, ukoliko ne postoji bice napravljena tabela
+2. Migracioni kod onda pretrazuje sve fajlove iz db/migrate i preskace one cija se verzija vec
+   nalazi u schema_migration tabeli. Ona primenjuje preostale migracije i za svaku upisuje novi
+   row u schmea_migration
+
+Povratak na stariju verziju migracije:
+rake db:migrate VERSION=201207221212
+
+Redo opcija: (rollback and rerun migration, STEP opciono)
+rake db:migrate:redo STEP=3
+
+Anatomy:
+db/migrate/20140919103022_ime_migracije.rb
+class ImeMigracije < ActiveRecord::Migration
+  def up
+    add_column :orders, :email, :string
+  end
+
+  def down
+    remove_column :orders, :email
+  end
+end
+
+- Dve migracije NE SMEJU da sadrze iste klase
+- UP > apply migration
+- DOWN > undo migration
+
+Change:
+Ukratko nekim operacijama Rails auto radi down. REVERSIBLE
+Tada mozemo da koristimo change.
+
+def change
+  add_column :orders, :email, :string
+end
+
+Columns:
+add_column :tabela, :naziv_kolone, :tip_podataka
+
+TIPOVI PODATAKA
+---------------
+AR omogucava da app bude nezavisan od DB sistema.
+Tako da rails auto vrsi konverziju podataka.
+Npr. :string >> Sqlite3 varchar(255); Postgres char varying(255)
+
+Tipovi:
+:binary, :boolean
+:date, :datetime, :time
+:decimal, :float, :integer
+:string, :text,
+:timestamp
+
+Opcije:
+null: true / false   >  not null (obavezno popunjeno)
+limit: size          >  velicina
+default: value       >  jasno samo po sebi
+precision            >  broj cifara
+scale                >  decimalni zarez
+
+
+RENAME
+On spada u reversible methode. Moze i u change
+rename_column :orders, :e_mail, :customer_email
+
+CHANGE
+Ovde se menja tip podataka.
+def up
+  change_column :orders, :order_type, :string
+end
+
+Down je problematicno zbog konverzije vrste podataka.
+Npr. nemoguce je string konvertovati u integer i u tom procesu se gube podaci.
+Rails daje exception koje ONEMOGUCAVA reverse (Oneway migration):
+def down
+  raise ActiveRecord::IrreversibleMigration
+end
+
+CREATE/DROP
+Create je reversible.
+create_table :order_histories do |t|
+  t.integer :order_id, null: false
+  t.text :notes
+
+  t.timestamps
+end
+
+ID polje u DB se auto generise za svaku tabelu.
+TIMESTAMPS je takodje neophodno za rails on dodaje created_at / updated_at colomn u tabelu.
+
+OPTIONS
+omogucava da se prosledi direktno komanda za SQL npr:
+create_table :tickets, options: "auto_increment = 10000" do |t|
+
+MYSQL TROUBLESHOOTING
+Po defaultu adapter u Rails koristi InnoDB engine.
+Medjutim kad se koristi options onda se engine menja na default MYSQL sa servera.
+ENGINE=InnoDB , najbolje je ovo preslediti sa options.
+
+RENAME TABLE
+rename_table :order_histories, :order_notes
+
+RENAME TABLE PROBLEMI
+Problem koji se desava sa renamovanjem tabela jeste da obicno tada vrsimo renamovnej i Modela.
+To medjutim dovodi do toga da starije migracije vise nerade pravilno zbog nedostatka model obj.
+
+Tim Lucas solucija:
+Jednostavno napravity DUMMY verzije modela clasa.
+
+class CreateOrderHistories < ActiveRecord::Migration
+  # PRAZNE DUMMY KLASE
+  class Order < ActiveRecord::Base; end
+  class OrderHistory < ActiveRecord::Base; end
+
+  def change
+    create_table :order_histories do |t|
+      t.integer :order_id, null: false
+      t.text :notes
+      t.timestamps
+    end
+
+  # TEST DATA, ali neznam cemu ovo
+  order = Order.find :first
+  OrderHistory.create(order: order_id, notes: "test")
+  end
+end
+
+
+INDEXI
+------
+Indeksi se koriste za optimizaciju perfomansi DB.
+Pravilo je da se UVEK dodaju za sva FOREIGN_KEY polja u tabeli.
+Moguce je i dodati ih i za bilo koje drugo column.
+
+NPR. DB koji ima veliku kolicinu ordera, dolazi do sporije pretrage po name.
+Resenje dodati index:
+add_index :orders, :name # 1.tabela, 2.column
+
+Ime indexa:
+index_table_on_column # index_orders_on_name
+
+custom name:
+name: 'ime_indexa'
+
+Unique: (sve vrednosti u indexiranim kolonama ce biti jedinstvene)
+unique: true
+
+Composite index:
+Index koji se sastoji od vise coloumns:
+add_index :orders, [:name, :address, :location]
+Ime indeksu se u ovom slucaju generise na osnovu prve kolone.
+
+Remove:
+remove_index
+
+
+PRIMARY KEY
+-----------
+Rails uvek generise ID polje koje je primary key u DB.
+Postoji mogucnost da se ovo overrideuje.
+
+NO PRIMARY KEY TABLE
+Nekad se javlja potreba da se definisu tabele koje nemaju primary key.
+Najcesci primer su JOIN TABLES(Many-to-Many relacija), one sadrze samo 2 kolone:
+svaka od njih je foreign_key ka drugoj tabeli.
+
+create_table :authors_books, id: false do |t|
+  t.integer :author_id, null: false
+  t.integer :book_id, null: false
+end
+
+
+ADVANCED MIGRATIONS
+-------------------
+EXECUTE
+Omogucava unosenje SQL komandi.
+
+defforeign_key(from_table,from_column,to_table)
+  constraint_name="fk_#{from_table}_#{to_table}"
+  execute%{
+    CREATETRIGGER#{constraint_name}_insert
+    BEFOREINSERTON#{from_table}
+    FOREACHROWBEGIN
+    SELECT
+    RAISE(ABORT,"constraintviolation:#{constraint_name}")
+    WHERE
+    (SELECTidFROM#{to_table}WHERE
+    id=NEW.#{from_column})ISNULL;
+    END;
+  }
+  execute%{
+    CREATETRIGGER#{constraint_name}_update
+    BEFOREUPDATEON#{from_table}
+    FOREACHROWBEGIN
+    SELECT
+    RAISE(ABORT,"constraintviolation:#{constraint_name}")
+    WHERE
+    (SELECTidFROM#{to_table}WHERE
+    id=NEW.#{from_column})ISNULL;
+    END;
+  }
+  execute%{
+    CREATETRIGGER#{constraint_name}_delete
+    BEFOREDELETEON#{to_table}
+    FOREACHROWBEGIN
+    SELECT
+    RAISE(ABORT,"constraintviolation:#{constraint_name}")
+    WHERE
+    (SELECTidFROM#{from_table}WHERE
+    #{from_column}=OLD.id)ISNOTNULL;
+    END;
+  }
+  end
+
+Within the up()migration, we can call this new method using this:
+
+  def up
+    create_table...do
+  end
+  foreign_key(:line_items,:product_id,:products)
+  foreign_key(:line_items,:order_id,:orders)
+end
+
+Ovo vazi samo za jednu migraciju. Ukoliko hocemo da ti methodi budu dostupni svim migracijama,
+moramo da napravimo MODUL u lib/:
+lib/migration_helpers.rb
+module MigrationHelpers
+
+  def foreign_key(.....)
+
+# UCINI GA DOSTUPNIM U ODGOVARAJUCOJ MIGRACIJI SA REQUIRE
+require 'migration_helpers'
+
+class CreateLineItems < ActiveRecord::Migration
+  
+  # EXTEND DODAJE METHODE IZ MODULA KAO CLASS MODULE
+  extend MigrationHelpers
+
+
+SCHEMA MANIPULATION OUTSIDE OF MIGRATIONS
+-----------------------------------------
+Svi metodi za migracije su dostupni kao methodi za AR objekte. Moze im se pristupiti iz MVC.
+connection >> je AR OBJ
+
+PRIMER:
+Odredjeni report se generise dosta brze ukoliko je indexiran city column u orders tabeli.
+Medjutim taj index je nepotreban u svakodnevnom funkcionisanju app, jer usporava ostatak app.
+
+Ovim pravio method koji kreira index, izvrsava block, brise index.
+Private metod u modelu ili lib/
+
+private
+
+def run_with_index(*columns)
+  connection.add_index(:orders,*columns)  # AR obj
+  begin
+    yield
+  ensure
+    connection.remove_index(:orders,*columns)
+  end
+end
+
+# Primena
+def get_city_statistics
+  run_with_index(:city)do
+    #..calculatestats BLOCK, koji ide u yield
+  end
+end
+
+
+
+CACHING
+=======
+
+U Rails3 verziji ove knjige postoji posebno poglavlje.
+Proveriti Rails Guide i uporediti ih.
+

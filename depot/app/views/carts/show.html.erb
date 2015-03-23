@@ -1,0 +1,20 @@
+<% if notice %>
+<p id="notice"><%= notice %></p>
+<% end %>
+
+<h2>Your Cart</h2>
+<table>
+
+  <%= render @cart %>
+
+  <tr class="total_line">
+    <td colspan="2">Total</td>
+    <td class="total_cell"><%= number_to_currency(@cart.total_price) %></td>
+  </tr>
+</table>
+
+<%# Dugme za brisanje sadrzaja korpe %>
+<%= button_to 'Empty Cart', @cart, method: :delete, data: { confirm: 'Are you sure?' } %>
+
+<%= link_to 'Edit', edit_cart_path(@cart) %> |
+<%= link_to 'Back', carts_path %>

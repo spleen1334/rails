@@ -1,0 +1,100 @@
+REST
+****
+
+REpresentational State Transfer
+
+Perform state transformations upon resources.
+
+REST HTTP Verbs:
+----------------
+GET    - get items from resource
+POST   - create new item in resource
+PUT    - replace existing item in resource
+PATCH  - update existing item in resource
+DELETE - delete existing item in resource
+
+PATCH nije podrzan od strane browsera/html.
+Rails to resava dodavanjem hidden input za patch.
+
+
+REST route se mogu mesati sa 'normalnim' routes.
+
+CLI COMMANDA ZA ROUTES:
+rake routes
+
+
+REST URL HELPERS
+----------------
+{ :controller => 'subjects', :action => 'show', :id => 5 } # staro
+subject_path(5) # novo
+
+index   > subjects_path
+new     > new_subject_path
+create  > subjects_path
+show    > subject_path(:id)
+edit    > edit_subject_path(:id)
+update  > subject_path(:id)
+delete  > delete_subject_path(:id)
+destroy > subject_path(:id)
+
+
+REST LINKS
+----------
+<%= link_to('All Subjects', subject_path) %>
+<%= link_to('Show Subjects', subject_path(@subject.id)) %>
+
+<%= link_to('Edit Subjects',
+  subject_path(@subject.id, :page => 1, :sort => 'name')) %>
+
+
+REST FORM (bitan je html method)
+---------
+form_for(:subject, :url => subject_path(@subject.id),
+    :html => { :method => :patch }) do |f| ...
+
+# shortcut radi samo za post/patch, za delete mora long
+form_for(@subject) do |f| ...
+
+
+NON-STANDARD RESOURCES
+----------------------
+resources :admin_users, :except => [:show] # ili only =>
+
+resources :subjects do
+  # Member = single item
+  member do
+    get :delete # delete_subject_path(:id)
+  end
+
+  # Collection = za sve objekte, kao za index action npr
+  collection do
+    get :export #export_subjects_path
+  end
+end
+
+
+NESTED RESOURCES
+----------------
+
+resources :subjects do
+  member do
+    get :delete # delete_subject_path(:id)
+  end
+
+  # Jednostavno se doda u resource
+  resources :pages do
+    member do
+      get :delete
+    end
+  end
+end
+
+NESTED PRIMER:
+--------------
+/subjects/:subject_id/pages > subject_pages_path(:sid)
+/subjects/:subject_id/pages/new > new_subject_page_path(:sid)
+/subjects/:subject_id/pages/:id/edit > edit_subject_page_path(:sid, :id)
+itd..
+
+TROSTRUKI NESTING: (proveriti kako bi izgledao URL)
+subject_page_sections_path(@subject.id, @page.id)

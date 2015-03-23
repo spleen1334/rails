@@ -1,0 +1,15 @@
+<h1>Demo#hello</h1>
+<p>Hello Rails!</p>
+
+<!-- Instance var primer -->
+<% @array.each do |n| %>
+  <%= n %>
+<% end %>
+
+<br>
+ID: <%= params[:id] %><br>
+ID: <%= @id %><br>
+Next page: <%= @page.to_i + 1 %><br>
+
+<hr>
+<%= params.inspect %>

@@ -1,0 +1,35 @@
+require 'test_helper'
+
+class MicropostTest < ActiveSupport::TestCase
+
+  def setup
+    @user = users(:spleen)
+    # @micropost = Micropost.new(content: "Lorem ipsum", user_id: @user.id)
+    @micropost = @user.microposts.build(content: 'Lorem ipsum') # pravilan nacin belongs_to, build = new za ovu relaciju, user_id je automatski ucitan iz user obj
+  end
+
+  test "should be valid" do
+    assert @micropost.valid?
+  end
+
+  test "user id should be present" do
+    @micropost.user_id = nil
+    assert_not @micropost.valid?
+  end
+
+  test "content should be present" do
+    @micropost.content = ' '
+    assert_not @micropost.valid?
+  end
+
+  test "content should be at most 140 characters" do
+    @micropost.content = 'a' * 141
+    assert_not @micropost.valid?
+  end
+
+  test "order should be most recent first" do
+    # ovde se koristi micropost fixture,
+    assert_equal Micropost.first, microposts(:most_recent)
+  end
+
+end

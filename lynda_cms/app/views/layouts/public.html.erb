@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Lynda CMS Admin<%= " | #{@page_title} " if @page_title %></title>
+  <%= stylesheet_link_tag('application', :media => 'all') %>
+</head>
+<body>
+
+  <div id="header">
+    <!-- @page_title je instance var koji uzimamo iz Viewa, specificno za rails -->
+    <h1>Simple CMS</h1>
+  </div>
+  <div id="main">
+    <!-- NAVBAR -->
+    <div id="navigation">
+      <%= render(:partial => 'layouts/navigation', :locals => { :subjects => @subjects }) %>
+    </div>
+    <div id="content">
+      <%= yield %>
+    </div>
+
+    <!-- CLEARFIX -->
+    <div class="clear"></div>
+  </div>
+  <div id="footer">
+    <p id="copyright">&copy; spleen / Spleen Ideal</p>
+  </div>
+
+</body>
+</html>

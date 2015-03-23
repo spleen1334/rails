@@ -1,0 +1,82 @@
+# FORM HELPERS
+# ------------
+form_for(:subject, url: { action: create },
+                   html: { multipart: true }) do |f|
+  f.text_field(:name, :size => 40, :maxlength => 40)
+  f.password_field(:password, :size => 40, :maxlength => 40)
+  f.text_area(:description, :size => "40x5") # ili :cols, :rows
+  f.hidden_field(:token)
+  f.radio_button(:content_type, "text")
+  f.radio_button(:content_type, "HTML")
+  f.label(:visible) # odnosi se na checkbox
+  f.check_box(:visible) # kreira i hidden element, zbog HTML specifikacije
+  f.file_field(:logo) # requires multipart true
+  submit_tag("Submit")
+end
+
+
+# OPTIONS HELPERS:
+# ----------------
+select(object, attribute, choices, options={}, html_options={})
+
+Options:
+  :selected      => object.attribute
+  :include_blank => false
+  :prompt        => true
+  :disabled      => false
+
+# Vrste dodela vrednosti za select
+form_for( :section, url: { action: 'create' } ) do |f|
+
+  # Range
+  f.select(:position, 1..5)
+
+  # Array
+  f.select( :content_type, ['text', 'HTML'] )
+
+  # Hash
+  f.select( :visible, { "Visible" => 1, "Hidden" => 2 } )
+
+  # Array of arrays
+  # Ovo prolazi kroz sve Page.all obj, i filtrira uz pomoc map,
+  # samo odredjene atribute, name ili id npr,
+  # rezultat map se vraca i koriste se kao opcije u <select>
+  f.select( :page_id, Page.all.map { |p| [p.name, p.id] } )
+
+  submit_tag("Submit")
+end
+
+
+# DATE & TIME HELPERS:
+# --------------------
+
+date_select( object, attribute, options={}, html_options={} )
+time_select( object, attribute, options={}, html_options={} )
+datetime_select( object, attribute, options={}, html_options={} )
+
+Options: ima ih mnogo (ri date_select)
+
+
+
+FORM ERRORS
+-----------
+
+Simple validation:
+validates_presence_of :name # obavezno prisustvo attr
+
+object.errors >> sadrzi sve greske iz validacije
+
+Error methode:
+objects.errors.clear # auto se izvrsava na svakom req
+objects.errors.size
+objects.errors.each |attr, msg| ... } # :name, "cant be blank" # delimicna poruka i symbol
+objects.errors.full_messages.each { |msg| ... } # "Name cant be blank" full poruka
+
+
+Displaying errors:
+1. List erros above the form
+2. Print/highlight erros with each form input
+
+Rails automatski dodaje class names za polja sa greskom:
+.field_with_errors
+To moze da se koristi za stilizovanje polja itd..

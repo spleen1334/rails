@@ -1,0 +1,24 @@
+CRUD ACTIONS
+------------
+
+CREATE
+> new     - display new record form
+> create  - process new record form (submited from new)
+
+READ
+> index   - list records
+> show    - display single record
+
+UPDATE
+> edit    - display edit record form
+> update  - process edit record form
+
+DELETE
+> delete  - display delete record form
+> destroy - process delete record form
+
+
+CONTROLLERS:
+
+1 ctrl per model
+Plural names

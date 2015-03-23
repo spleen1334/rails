@@ -1,0 +1,107 @@
+AUTHENTICATION
+**************
+
+1. Admin creates user in DB
+> Password is encrypted before user is stored
+
+2. User logs in via login form
+
+3. App authenticates user
+> Searches for username in db
+> If username found: comapres with encrypted password
+> If password matches: sets a var in the session to the user ID
+  and redirects to post-login page
+
+4. User requests additional password-protected pages
+> Cookies and session data ara available with each req
+
+5. App chesk the session data for the user ID
+> If present: returns req page
+> If absent: redirects to login
+
+6. User logout
+> Set user id stored in session var to NULL
+
+
+HASHING PASSWORD
+----------------
+One-way encryption > non-reversible even by admins
+
+Blowfish > recommended
+
+
+RAILS PASSWORD:
+has_secure_password
+
+Requirements:
+1.bcrypt-ruby gem
+2.db must have column "password_digest"
+
+HAS_SECURE_PASSWORD STA RADI:
+1. attr_reader :password
+# password=(unencrypted_password)
+# vrsi encrypt password-a uz pomoc blowfish, store u password_digest
+
+2. validates_presence_of :password, :on => :create
+   validates_presence_of :password_confirmation
+   validates_confirmation_of :password
+
+3. authenticate(unencrypted_password) # dodata methoda za proveru
+
+
+
+COOKIES
+-------
+1. Add 'state' to a website
+2. Web server sends data in a cookie file to the browser, which then saves it
+3. Browser sends cookie data with EACH req for that web server
+4. Limit max 4k (4096 char)
+5. Reside on users computer ( can be read, deleted, altered )
+
+RAILS COOKIES:
+--------------
+cookies[:username] = "asdf"
+cookies[:naziv_bilokoji] = 'mica'
+
+cookies[:username] = {
+  value: 'asdf', expires: 1.week.from_now
+}
+
+<%= cookies[:username %>]
+
+
+SESSIONS
+--------
+1. Dizajnirani da bi se resili ogranicenja cookies
+   > More data stored, saved on server (no altered, reading outside)
+2. Proces:
+   1. Web server sends an ID in a cookie to the browser, which then saves it
+      User cuva samo ID(koji je referenca za session file/db entry na serveru)
+      data ostaje na serveru
+   2. Browsers sends cookie data with each request
+3. Limit:
+   > Extra time to retrieve session file
+   > Old session files accumulate
+   > Session cookie stil resides on users computer (can be deleted or hijacked)
+
+RAILS SESSION:
+session[:key] = 'value'
+
+<%= session[:key] %>
+
+SESSION STORAGE:
+1. File storage (rails v1, slow, does not scale, bloat files)
+2. DB Storage (rails v2, not fast, requires db call, db bloat)
+3. Cookie storage (rails v3-4, super cookie, fast, 4k size, no bloat, no hijack,
+   encoded but not encrypted, digest value stored-md5 hash?)
+
+
+BEFORE_ACTION
+-------------
+before_action :ime_methoda, :only => [:ads, :asd]
+1. Specify methods to activate before action: only, except
+2. Should call private/protected methods (tako nemogu da se pozovu kao action)
+3. Must return false to halt beforeaction chain
+
+
+

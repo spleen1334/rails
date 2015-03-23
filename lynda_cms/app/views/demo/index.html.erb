@@ -1,0 +1,30 @@
+<h1>Demo#index</h1>
+<p>Hello Rails!</p>
+
+<a href="/demo/hello">Hello page 1</a><br/>
+
+<!-- LINKS, smart linkovanje -->
+<!-- ukoliko nije naveden ctrl defaultuje na current -->
+<%= link_to 'Hello page 2', { action: 'hello' } %><br/>
+
+
+<!-- URL PARAMS -->
+<%# Sve sto se primi cuva se u params
+  id > specifican jer je uvek prvi i pre ? u http req %>
+<%= link_to 'Hello with parameters', { action: 'hello', page: 5, id: 20 } %>
+
+<br/>
+
+<!-- JS ASSET TEST -->
+<% name = "Spleen" %>
+<% name = "Sorry!'); alert('I hacked you!" %>
+
+<%= link_to('Roar', '#', onclick: "jsRoar('JavaScript'); return true;") %>
+
+<!-- Hacked string ovde radi odnosno hackuje app -->
+<%# <%= link_to('Roar', '#', onclick: "jsRoar('#{name}'); return true;") %>
+
+<!-- escapovanje js -->
+<%= link_to('Roar', '#', onclick: "jsRoar('#{j(name)}'); return true;") %>
+
+<%= javascript_tag("jsRoar('Rails');") %>

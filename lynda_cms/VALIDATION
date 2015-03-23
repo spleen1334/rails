@@ -1,0 +1,58 @@
+DATA VALIDATION
+---------------
+
+Postavlja se u MODELu.
+
+Lista methoda:
+-------------
+1. validates_presence_of     > ne sme biti prazan;
+2. validates_length_of       > duzina; is:, :minimum, :maximum, :within ...
+3. validates_numericality_of > integer ili float; :equal_to, :greater_than ...
+4. validates_inclusion_of    > mora da bude iz liste/array koje smo prosledili
+5. validates_exclusion_of    > inverzija inclusion_of
+6. validates_format_of       > regex provera
+7. validates_uniqueness_of   > samo jedan record u db (npr za username)
+8. validates_acceptance_of   > manje koristan, virtual attribute
+9. validates_confirmation_of > attr mora da se potvrdi sa 2 unosa, (npr password)
+10. validates_associated     > proverava has_many/belongs_to, i jos neke stvari
+
+Options za methode od gore:
+:allow_nil => true  - skip validation if attr is nil
+:allow_blank => true - skip validation if attr is blank
+
+:on => :save/:create/:update - za razna stanja, save je default(validate on create&update)
+
+:if => :method/:unless => :method - custom methoda def u modelu
+
+
+SHORTCUT STYLE (SEXY):
+----------------------
+Mnogo lepsi, laksi za citanje, oni ustvari pozivaju gornje fullname methode:
+
+validates :email, :presence => true,
+                  :length => { :maximum => 100 },
+                  :uniqueness => true,
+                  :format => EMAIL_REGEX,
+                  :confirmation => true
+
+
+OBJ.VALID?
+----------
+ActiveRecord metoda koja proverava da li je obj valid.
+Rails ga poziva automatski ali ukoliko je neophodna provera moze da se koristi.
+
+ERRORS:
+-------
+obj.errors > ovde se skladiste sve greske
+obj.errors.full_messages > prikazi gresku sa punom porukom
+obj.errors.clear > obrisi sve greske
+
+
+CUSTOM VALIDATION:
+------------------
+
+validate :custom_method
+
+def custom_method
+  ...
+end

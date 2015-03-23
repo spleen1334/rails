@@ -1,0 +1,139 @@
+ASSET PIPELINE
+**************
+
+Ukljucen po defaultu.
+
+
+Prednosti:
+----------
+1. Concatenates CSS & JS
+2. Compresses/mififies CSS & JS + gzip
+3. Precompiles CSS & JS (obavlja sve operacije ahead of time, a ne za vreme request)
+4. Omogucava da se asseti pisu u drugim jezicima (CoffeeScript, SASS, erb ..)
+5. Asset Fingerprinting > za caching,
+   Generise md5-hash koji ubacuje na end filename-a.
+   Svaki put kad dodje do neke promene generise novi file(sa novim md5-hash),
+   to force-uje browser da ucita i cachira novi fajl.
+
+
+Lokacija:
+---------
+app/assets/images
+app/assets/javascripts
+app/assets/stylesheets
+
+
+Public dir:
+-----------
+Svi fajlovi odavde se koriste/ucivatavju bez ikakvog procesuiranja (staticni su).
+Nema concatenate, compression, minification, No sass CoffeeScript erb..
+NO FiNGERPRINTING > no caching
+
+
+MANIFEST Files:
+---------------
+Rails uz pomoc ovog fajla zna kako i kojim redosledom da izvrsi gore navedene operacije.
+
+Komande:
+Nalaze se u okviru komentara, zovu se DIRECTIVES:
+*= require_self  >> include sve ono sto se nalazi u ovom fajlu
+*= require_tree . >> include sve fajlove koji se nalaze u current dir, recursive je
+
+Manifest file radi sledece:
+1. Sadrzi directives za includovanje asset fajlova
+2. Loads, processes, concatenates, compresses
+3. Concatenates >> Stavlja sve u jedan fajl, to je good practise
+4. Procesuiranje se vrsi TOP-TO-BOTTOM
+   require_tree nema definisan redosled (unspecified order)
+   - Ukoliko zelimo da includujemo fajlove u tacno odredjenom redosledu onda:
+     >> require naziv_fajla1
+     >> require naziv_fajla2
+     >> ovo nece ucitati 2 puta isti fajl
+5. Nakon svega Rails PREKOMPAJLIRA sve assete u jedan file:
+   app/assets/application.css
+   >> public/assets/application-123123kjkljlk123123.css
+   >> public/assets/application-123123kjkljlk123123.css.gz
+
+   app/assets se NIKADA ne prikazuju korisniku, vec samo rezultat precompilinga iz public dir
+
+
+Development vs Production
+-------------------------
+
+Development:
+Skip concatenation, compression, fingerprinting..
+Jedino izvrsava file processing (za SASS...)
+
+Production:
+Skipuje sve i NE radi asset processing!!!
+
+Postavlja se pitanje cemu onda sve ovo ukoliko se ne izvrsava ni u dev ni u production.
+
+Odgovor lezi u tome da PRECOMPLING traje veoma mnogo vremena (moze biti i do par minuta). Rails zbog toga pretpostavlja da se svaki asset u PRODUCTION mora biti PRECOMPILIRAN i spreman za koriscenje na web serveru.
+
+
+PRECOMPILATION:
+---------------
+RAILS_ENV=production bundle exec rake assets:precompile
+>> ovo se koristi za ahead of time compilation, izvrsavamo ovu komandu pa onda uploadujemo na server
+
+PROBLEM:
+--------
+Zbog razlike izmedju dev/production i precompilinga, moze doci do toga da npr app radi u development a ne radi u production.
+
+
+
+
+STYLESHEET:
+-----------
+
+Da bi se includovali asset fajlovi u okviru templates, koriste se helper metode.
+
+<link href="/assets/stylesheets/application.css" rel="stylesheet"
+type="text/css" media="all" />
+
+stylesheet_link_tag('application') # application je manifest fajl
+stylesheet_link_tag('application', media: 'all')
+
+sass-rails gem # Gemfile & bundle install
+
+
+JAVASCRIPT:
+-----------
+jQuery included by default.
+
+Prikazano je da je moguce koristiti vise manifest fajlova.
+
+jquery-rails gem # Gemfile & bundle install
+coffee-rails + uglifier gems # Gemfile & bundle install
+
+JS Helpers:
+<script src='/assets/javascripts/application.js' type='text/javascript'></script>
+javascript_include_tag('application') # application = manifest
+
+JS Directly on a page:
+<%= javascript_tag("alert('Are you sure?');") %>
+
+JS Block:
+<%= javascript_tag do %>
+  alert('Are you sure?');
+<% end %>
+
+Escaping JS:
+escape_javascript() ili j()
+
+
+IMAGES:
+-------
+user-uploaded img: /public/images # cak i sa asset pipeline
+
+Image upload gems:
+Ovi gemovi su za user img ubacivanje u asset pipeline
+Paperclip, CarrierWave
+
+<image src="/assets/logo.png" />
+<%= image_tag('logo.png') %>
+
+Dimenzije:
+<%= image_tag('logo.png', size: '90x55', alt: 'logo') %>
+<%= image_tag('logo.png', width: 90, height: 55) %>

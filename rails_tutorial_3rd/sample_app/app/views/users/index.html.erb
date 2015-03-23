@@ -1,0 +1,24 @@
+<% provide(:title, 'All users') %>
+<h1>All users</h1>
+
+<%= will_paginate %> <!-- auto se odnosi na @users -->
+
+<!-- STARO -->
+<!-- <ul class="users"> -->
+<!--   <% @users.each do |user| %> -->
+<!--     <!&#45;&#45; <li> &#45;&#45;> -->
+<!--     <!&#45;&#45;   <%# <%= gravatar_for user, size: 50 %> &#45;&#45;> -->
+<!--     <!&#45;&#45;   <%= gravatar_for user %> &#45;&#45;> -->
+<!--     <!&#45;&#45;   <%= link_to user.name, user %> &#45;&#45;> -->
+<!--     <!&#45;&#45; </li> &#45;&#45;> -->
+<!--     <%= render user %> -->
+<!--   <% end %> -->
+<!-- </ul> -->
+
+<!-- Rails feature, on automaski poziva _partial koliko kod ima user u @users obj, tako da nemora petlja -->
+<!-- rails auto konvertuje u jedninu user u _partial -->
+<ul class="users">
+  <%= render @users %>
+</ul>
+
+<%= will_paginate %>
